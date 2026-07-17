@@ -1,0 +1,255 @@
+# Copyright (C) 2026 Recurrente
+# This file is distributed under the GPLv2 or later.
+msgid ""
+msgstr ""
+"Project-Id-Version: Recurrente for WooCommerce 0.1.0\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/recurrente-woocommerce\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"POT-Creation-Date: 2026-07-16T18:54:18+00:00\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"X-Generator: WP-CLI 2.12.0\n"
+"X-Domain: recurrente-for-woocommerce\n"
+
+#. Plugin Name of the plugin
+#: recurrente-payments.php
+msgid "Recurrente for WooCommerce"
+msgstr ""
+
+#. Plugin URI of the plugin
+#. Author URI of the plugin
+#: recurrente-payments.php
+msgid "https://recurrente.com"
+msgstr ""
+
+#. Description of the plugin
+#: recurrente-payments.php
+msgid "Cobra en WooCommerce con Recurrente — checkout hospedado, tarjetas, transferencias y suscripciones. Plugin oficial."
+msgstr ""
+
+#. Author of the plugin
+#: recurrente-payments.php
+#: includes/class-recurrente-gateway.php:18
+msgid "Recurrente"
+msgstr ""
+
+#: includes/class-recurrente-api-client.php:107
+msgid "Error al comunicarse con Recurrente."
+msgstr ""
+
+#: includes/class-recurrente-checkout-builder.php:135
+msgid "Cuota de inscripción"
+msgstr ""
+
+#. translators: %s: nombre del método de envío
+#: includes/class-recurrente-checkout-builder.php:169
+#, php-format
+msgid "Envío: %s"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:19
+msgid "Acepta tarjetas, transferencias y suscripciones con el checkout hospedado de Recurrente."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:52
+msgid "General"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:56
+msgid "Activar/Desactivar"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:58
+msgid "Activar Recurrente"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:62
+msgid "Título"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:64
+msgid "Lo que ve el cliente al elegir el método de pago."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:65
+msgid "Tarjeta, transferencia o cuotas (Recurrente)"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:69
+msgid "Descripción"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:71
+msgid "Pagá de forma segura con Recurrente. Te redirigiremos para completar tu pago."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:74
+msgid "Opciones de checkout"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:76
+msgid "Qué métodos y cuotas ve el comprador. Dejá vacío para heredar la configuración de tu cuenta de Recurrente."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:79
+msgid "Métodos de pago"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:83
+msgid "Tarjeta"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:84
+msgid "Transferencia bancaria"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:85
+msgid "Balance Recurrente"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:86
+msgid "Dólares digitales (stablecoins)"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:88
+msgid "Métodos que ve el comprador en el checkout. Dejalo vacío para usar la configuración de tu cuenta de Recurrente."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:92
+msgid "Cuotas (meses)"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:96
+msgid "3 meses"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:97
+msgid "6 meses"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:98
+msgid "12 meses"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:99
+msgid "18 meses"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:101
+msgid "Opciones de cuotas a mostrar. Solo aplica a GTQ y requiere tarjeta habilitada. Vacío = sin cuotas o según tu cuenta."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:105
+msgid "Precio dinámico"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:107
+msgid "Cobrar recargo según el método de pago"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:108
+msgid "Si se activa, Recurrente suma un recargo cuando el comprador elige un método más costoso (ej. tarjeta). El monto base sigue siendo el total de la orden. Nota: con precio dinámico Recurrente muestra todos los métodos y cuotas disponibles para comparar precios, ignorando las restricciones de arriba."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:113
+msgid "Producción"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:115
+msgid "Se usa cuando el modo de pruebas está desactivado. Cobros reales."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:118
+msgid "Llave secreta de producción"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:120
+msgid "Recurrente → Configuración → Llaves API."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:124
+msgid "Modo de pruebas (sandbox)"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:126
+msgid "Todo lo que necesitás para probar sin cobros reales: activá el modo de pruebas, pegá tu llave secreta de pruebas y pagá con la tarjeta 4242 4242 4242 4242. Los pagos de prueba disparan webhooks simulados, así que también se prueba la conciliación de la orden — para eso el sitio necesita una URL pública (Live Link o túnel); en localhost la orden queda en \"pendiente\"."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:129
+msgid "Activar modo de pruebas"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:131
+msgid "Usar la llave de pruebas en vez de la de producción"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:135
+msgid "Llave secreta de pruebas"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:137
+msgid "Recurrente → Configuración → Llaves API (llave de test)."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:141
+msgid "Avanzado"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:145
+msgid "Registro de depuración"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:147
+msgid "Registrar eventos en WooCommerce → Estado → Registros"
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:199
+msgid "Recurrente solo acepta GTQ y USD."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:210
+msgid "No pudimos iniciar el pago con Recurrente. Intentá de nuevo."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:216
+msgid "Esperando pago en Recurrente."
+msgstr ""
+
+#: includes/class-recurrente-plugin.php:73
+msgid "Configuración"
+msgstr ""
+
+#: includes/class-recurrente-plugin.php:79
+msgid "Recurrente para WooCommerce requiere que WooCommerce esté instalado y activo."
+msgstr ""
+
+#: includes/class-recurrente-subscriptions.php:69
+msgid "Actualizado por webhook de Recurrente."
+msgstr ""
+
+#: includes/class-recurrente-webhook-handler.php:141
+msgid "Reembolsado en Recurrente."
+msgstr ""
+
+#. translators: %s: "pruebas" o "producción"
+#: includes/class-recurrente-webhook-registrar.php:97
+#, php-format
+msgid "La llave secreta de %s es inválida. Verificá que sea tu llave secreta de Recurrente (Configuración → Llaves API)."
+msgstr ""
+
+#. translators: %s: "pruebas" o "producción"
+#: includes/class-recurrente-webhook-registrar.php:107
+#, php-format
+msgid "No se pudo registrar el webhook de Recurrente (%s). Intentá guardar de nuevo en unos minutos."
+msgstr ""
+
+#: includes/class-recurrente-webhook-registrar.php:113
+msgid "pruebas"
+msgstr ""
+
+#: includes/class-recurrente-webhook-registrar.php:113
+msgid "producción"
+msgstr ""
