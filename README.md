@@ -8,7 +8,7 @@ hospedado de Recurrente (tarjeta, transferencia, cuotas y suscripciones) y la or
 automáticamente en WooCommerce por webhook. Para comercios en Guatemala — monedas GTQ y USD.
 
 > **Instalación y configuración:** seguí la guía oficial →
-> [Cómo instalar el plugin de Recurrente en WooCommerce](https://ayuda.recurrente.com/es/articles/8971522-como-instalo-el-plugin-de-recurrente-en-woocommerce)
+> [Cómo instalar el plugin de Recurrente en WooCommerce](https://ayuda.recurrente.com/es/articles/15984301-como-instalo-el-plugin-de-recurrente-en-woocommerce)
 
 ## Cómo funciona
 
@@ -22,6 +22,21 @@ orden.
 Soporta suscripciones (requiere **WooCommerce Subscriptions**): Recurrente es dueño del ciclo de cobro
 y sincroniza los estados por webhook. Compatible con HPOS y con el checkout por bloques (el default
 desde WooCommerce 8.3), además del checkout clásico.
+
+## Pruebas y producción
+
+El plugin mantiene separados los dos ambientes:
+
+1. En **WooCommerce → Ajustes → Pagos → Recurrente**, guardá la llave secreta de pruebas y la de
+   producción.
+2. Al guardar, el plugin registra un webhook independiente con cada llave configurada y conserva por
+   separado sus secretos de firma.
+3. Activá **Modo de pruebas** para crear checkouts con la llave TEST. Desactivalo para usar la llave
+   LIVE y procesar cobros reales.
+
+Los pagos de prueba con `4242 4242 4242 4242` envían webhooks simulados con `live_mode: false` al
+endpoint TEST. Para validar la conciliación completa, WordPress debe tener una URL pública que
+Recurrente pueda alcanzar; un sitio disponible solo en `localhost` no recibirá el webhook.
 
 ## Desarrollo
 

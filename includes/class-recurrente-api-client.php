@@ -6,7 +6,8 @@
  * Spec:  recurrente-app/docs/api/openapi.yaml
  *
  * Test vs live is decided purely by which secret key you configure — both
- * environments share the same base URL. Test keys never fire webhooks.
+ * environments share the same base URL. A TEST key manages test webhook
+ * endpoints, which receive simulated events with live_mode:false.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

@@ -26,6 +26,8 @@ Features:
 * Subscriptions (requires the WooCommerce Subscriptions extension).
 * Compatible with High-Performance Order Storage (HPOS).
 * Works with both the block-based checkout (WooCommerce 8.3+ default) and the classic shortcode checkout.
+* Separate TEST and LIVE keys, webhook endpoints and signing secrets.
+* End-to-end sandbox payments with simulated webhooks.
 
 == External services ==
 
@@ -44,9 +46,9 @@ Recurrente through Svix (https://www.svix.com/).
 1. Upload the plugin to `/wp-content/plugins/recurrente-for-woocommerce` or install it
    from the WordPress dashboard.
 2. Activate it under "Plugins".
-3. Go to WooCommerce → Settings → Payments → Recurrente and configure your API keys.
-   Saving the settings automatically registers the webhook endpoint in Recurrente —
-   no manual webhook setup is needed.
+3. Go to WooCommerce → Settings → Payments → Recurrente and configure your TEST and LIVE secret keys.
+   Saving the settings automatically registers a separate webhook endpoint for each configured
+   environment — no manual webhook setup is needed.
 
 == Screenshots ==
 
@@ -62,6 +64,12 @@ Recurrente operates in Guatemala. Supported currencies are GTQ and USD.
 = Do I need an SSL certificate? =
 
 Yes. WooCommerce and Recurrente require HTTPS to process payments in production.
+
+= How do I test before going live? =
+
+Enable Test mode under WooCommerce → Settings → Payments → Recurrente and add your TEST secret key.
+Use card 4242 4242 4242 4242 for a successful test payment. Recurrente sends simulated webhooks to the
+TEST endpoint, so your WordPress site must have a public URL to verify the complete order flow.
 
 == Changelog ==
 
