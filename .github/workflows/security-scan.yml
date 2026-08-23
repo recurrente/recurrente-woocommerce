@@ -1,0 +1,50 @@
+name: Security Scan
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [master]
+  schedule:
+    - cron: "35 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    name: Semgrep Static Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container: semgrep/semgrep:1.174.0
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Scan source code
+        run: semgrep scan --config p/default --severity ERROR --severity WARNING --error --metrics=off
+
+  php:
+    name: PHP ${{ matrix.php-version }} Static Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ["7.4", "8.1", "8.4"]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: shivammathur/setup-php@b604ade2a87db23f8871b7182e69ec5e75effb45 # v2
+        with:
+          php-version: ${{ matrix.php-version }}
+          coverage: none
+      - name: Lint PHP sources
+        shell: bash
+        run: |
+          mapfile -d '' php_files < <(find . -type f -name "*.php" -print0)
+          if (( ${#php_files[@]} == 0 )); then
+            echo "No PHP files found"
+            exit 1
+          fi
+          printf '%s\0' "${php_files[@]}" | xargs -0 -n1 php -l
+      - name: Run tests
+        run: php tests/run.php
