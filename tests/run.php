@@ -33,4 +33,4 @@ foreach ( glob( __DIR__ . '/test-*.php' ) as $file ) {
 }
 
 echo "\n{$cases} tests, {$failures} failures\n";
-exit( $failures ? 1 : 0 );
+exit( $failures || ! $cases ? 1 : 0 );
