@@ -30,7 +30,9 @@ require_once dirname( __DIR__ ) . '/includes/class-recurrente-gateway.php';
 function recurrente_buyer_urls( $order ) {
 	$gateway = ( new ReflectionClass( 'Recurrente_Gateway' ) )->newInstanceWithoutConstructor();
 	$method  = new ReflectionMethod( 'Recurrente_Gateway', 'buyer_urls' );
-	$method->setAccessible( true );
+	if ( PHP_VERSION_ID < 80100 ) {
+		$method->setAccessible( true ); // Required before PHP 8.1; deprecated since 8.5.
+	}
 	return $method->invoke( $gateway, $order );
 }
 
