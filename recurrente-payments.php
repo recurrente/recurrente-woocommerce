@@ -3,7 +3,7 @@
  * Plugin Name:       Recurrente for WooCommerce
  * Plugin URI:        https://recurrente.com
  * Description:        Cobra en WooCommerce con Recurrente — checkout hospedado, tarjetas, transferencias y suscripciones. Plugin oficial.
- * Version:           0.1.0
+ * Version:           0.1.1
  * Author:            Recurrente
  * Author URI:        https://recurrente.com
  * Text Domain:       recurrente-for-woocommerce
@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit; // No direct access.
 }
 
-define( 'RECURRENTE_PLUGIN_VERSION', '0.1.0' );
+define( 'RECURRENTE_PLUGIN_VERSION', '0.1.1' );
 define( 'RECURRENTE_PLUGIN_FILE', __FILE__ );
 define( 'RECURRENTE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
