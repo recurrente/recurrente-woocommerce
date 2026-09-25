@@ -240,16 +240,26 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 	}
 
 	private function checkout_payload( $order, $builder ) {
-		return array(
+		return array_merge( $this->buyer_urls( $order ), array(
 			'items'       => $builder->items(),
-			'success_url' => $this->get_return_url( $order ),
-			'cancel_url'  => $order->get_cancel_order_url_raw(),
 			'customer_id' => $this->customer_id_for( $order ),
 			'metadata'    => array(
 				'wc_order_id'  => (string) $order->get_id(),
 				'wc_order_key' => $order->get_order_key(),
 				'source'       => 'woocommerce',
 			),
+		) );
+	}
+
+	/**
+	 * Where the hosted checkout sends the buyer. "Atrás" (cancel_url) returns to
+	 * the order's pay page with the order still pending, so the buyer can retry
+	 * or pick another method; it must not cancel the order and restock it.
+	 */
+	private function buyer_urls( $order ) {
+		return array(
+			'success_url' => $this->get_return_url( $order ),
+			'cancel_url'  => $order->get_checkout_payment_url(),
 		);
 	}
 
