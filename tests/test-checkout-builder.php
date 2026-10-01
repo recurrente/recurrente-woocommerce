@@ -62,6 +62,10 @@ if ( ! class_exists( 'WC_Order' ) ) {
 		public $items    = array();
 		public $shipping = array();
 		public $fees     = array();
+		public $total = 247.00;
+		public function get_total() {
+			return $this->total;
+		}
 		public function get_currency() {
 			return $this->currency;
 		}
@@ -160,4 +164,57 @@ it( 'options: has_dynamic_pricing applied to one-time items', function () {
 it( 'options: nothing set leaves items untouched (inherit account defaults)', function () {
 	$i = ( new Recurrente_Checkout_Builder( recurrente_sample_order() ) )->items()[0];
 	return ! isset( $i['payment_method_types'] ) && ! isset( $i['available_installments'] ) && ! isset( $i['has_dynamic_pricing'] );
+} );
+
+foreach ( array( 999.00, 999.99, 1000.00, 1000.01 ) as $total ) {
+	it( "minimum: Q{$total} compares inclusively with Q1000 for every checkout line", function () use ( $total ) {
+		$order        = recurrente_sample_order();
+		$order->total = $total;
+		$items        = ( new Recurrente_Checkout_Builder( $order, array(
+			'available_installments' => array( 3, 6 ),
+			'installments_minimum'   => 1000,
+		) ) )->items();
+		$expected = $total < 1000 ? array() : array( 3, 6 );
+		foreach ( $items as $item ) {
+			if ( $expected !== $item['available_installments'] ) {
+				return false;
+			}
+		}
+		return true;
+	} );
+}
+
+it( 'minimum: disables inherited account installments below the threshold', function () {
+	$items = ( new Recurrente_Checkout_Builder( recurrente_sample_order(), array( 'installments_minimum' => 1000 ) ) )->items();
+	return array() === $items[0]['available_installments'];
+} );
+
+it( 'minimum: preserves inherited installments at the threshold', function () {
+	$order        = recurrente_sample_order();
+	$order->total = 1000;
+	$items        = ( new Recurrente_Checkout_Builder( $order, array( 'installments_minimum' => 1000 ) ) )->items();
+	return ! isset( $items[0]['available_installments'] );
+} );
+
+it( 'minimum: uses the final order total including shipping rather than individual products', function () {
+	$items = ( new Recurrente_Checkout_Builder( recurrente_sample_order(), array(
+		'installments_minimum'   => 247,
+		'available_installments' => array( 3 ),
+	) ) )->items();
+	return array( 3 ) === $items[0]['available_installments'] && array( 3 ) === $items[2]['available_installments'];
+} );
+
+it( 'minimum: zero preserves selected installments', function () {
+	$items = ( new Recurrente_Checkout_Builder( recurrente_sample_order(), array(
+		'installments_minimum'   => 0,
+		'available_installments' => array( 6 ),
+	) ) )->items();
+	return array( 6 ) === $items[0]['available_installments'];
+} );
+
+it( 'minimum: never sends installments for USD orders', function () {
+	$order           = recurrente_sample_order();
+	$order->currency = 'USD';
+	$items           = ( new Recurrente_Checkout_Builder( $order, array( 'installments_minimum' => 1000 ) ) )->items();
+	return ! isset( $items[0]['available_installments'] );
 } );

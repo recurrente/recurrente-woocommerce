@@ -23,6 +23,18 @@ Soporta suscripciones (requiere **WooCommerce Subscriptions**): Recurrente es du
 y sincroniza los estados por webhook. Compatible con HPOS y con el checkout por bloques (el default
 desde WooCommerce 8.3), además del checkout clásico.
 
+## Cuotas según el total de la orden
+
+En **WooCommerce → Ajustes → Pagos → Recurrente**, elegí los meses de cuotas y configurá
+**Monto mínimo para cuotas (GTQ)**. Con un mínimo de Q1,000, una orden de Q999.99 no ofrece
+cuotas y una de Q1,000 sí puede mostrar las opciones elegidas. Se usa el total final de
+WooCommerce, con impuestos, envío y descuentos; el banco y Recurrente mantienen sus reglas
+habituales de elegibilidad. Vacío o 0 conserva la configuración anterior.
+
+El mínimo solo aplica a compras de pago único en GTQ. Requiere **Precio dinámico** desactivado,
+porque ese modo muestra todas las cuotas de la cuenta y no respeta restricciones por checkout.
+El plugin rechaza guardar ambas opciones juntas.
+
 ## Pruebas y producción
 
 El plugin mantiene separados los dos ambientes:

@@ -119,6 +119,13 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 				'description' => __( 'Opciones de cuotas a mostrar. Solo aplica a GTQ y requiere tarjeta habilitada. Vacío = sin cuotas o según tu cuenta.', 'recurrente-for-woocommerce' ),
 				'desc_tip'    => true,
 			),
+			'installments_minimum'   => array(
+				'title'       => __( 'Monto mínimo para cuotas (GTQ)', 'recurrente-for-woocommerce' ),
+				'type'        => 'price',
+				'description' => __( 'Se compara con el total final de la orden, incluidos envío, impuestos y descuentos. Por debajo del mínimo no se ofrecen cuotas; desde ese monto se usan las opciones elegidas arriba. Vacío o 0 = sin mínimo. Requiere precio dinámico desactivado.', 'recurrente-for-woocommerce' ),
+				'desc_tip'    => true,
+				'default'     => '',
+			),
 			'dynamic_pricing'        => array(
 				'title'       => __( 'Precio dinámico', 'recurrente-for-woocommerce' ),
 				'type'        => 'checkbox',
@@ -174,11 +181,25 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 	 * registration doubles as validation of the key).
 	 */
 	public function process_admin_options() {
+		if ( ! $this->valid_installment_settings() ) {
+			return false;
+		}
 		$saved = parent::process_admin_options();
 		foreach ( Recurrente_Webhook_Registrar::sync_all( $this ) as $error ) {
 			WC_Admin_Settings::add_error( $error );
 		}
 		return $saved;
+	}
+
+	private function valid_installment_settings() {
+		$post_data = $this->get_post_data();
+		$minimum   = (float) $this->get_field_value( 'installments_minimum', $this->form_fields['installments_minimum'], $post_data );
+		$dynamic   = $this->get_field_value( 'dynamic_pricing', $this->form_fields['dynamic_pricing'], $post_data );
+		if ( $minimum < 0 || ( $minimum > 0 && 'yes' === $dynamic ) ) {
+			WC_Admin_Settings::add_error( __( 'El mínimo para cuotas debe ser mayor o igual a 0 y requiere precio dinámico desactivado. No se guardaron los cambios.', 'recurrente-for-woocommerce' ) );
+			return false;
+		}
+		return true;
 	}
 
 	public function process_payment( $order_id ) {
@@ -203,6 +224,11 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 		$installments = array_filter( array_map( 'intval', (array) $this->get_option( 'installments', array() ) ) );
 		if ( $installments ) {
 			$options['available_installments'] = array_values( $installments );
+		}
+
+		$minimum = (float) $this->get_option( 'installments_minimum', 0 );
+		if ( $minimum > 0 ) {
+			$options['installments_minimum'] = $minimum;
 		}
 
 		if ( 'yes' === $this->get_option( 'dynamic_pricing' ) ) {

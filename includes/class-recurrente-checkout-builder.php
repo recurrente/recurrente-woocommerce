@@ -27,7 +27,8 @@ class Recurrente_Checkout_Builder {
 	/**
 	 * @param array $options Per-item checkout config from the gateway settings:
 	 *   payment_method_types (array), available_installments (array),
-	 *   has_dynamic_pricing (bool). Omitted keys inherit the account defaults.
+	 *   has_dynamic_pricing (bool), installments_minimum (GTQ amount).
+	 *   Omitted keys inherit the account defaults.
 	 */
 	public function __construct( WC_Order $order, array $options = array() ) {
 		$this->order   = $order;
@@ -62,14 +63,23 @@ class Recurrente_Checkout_Builder {
 			$item['payment_method_types'] = $this->options['payment_method_types'];
 		}
 		if ( 'one_time' === $item['charge_type'] ) {
-			if ( isset( $this->options['available_installments'] ) && 'GTQ' === $this->currency() ) {
-				$item['available_installments'] = $this->options['available_installments'];
+			$installments = $this->available_installments();
+			if ( null !== $installments && 'GTQ' === $this->currency() ) {
+				$item['available_installments'] = $installments;
 			}
 			if ( ! empty( $this->options['has_dynamic_pricing'] ) ) {
 				$item['has_dynamic_pricing'] = true;
 			}
 		}
 		return $item;
+	}
+
+	private function available_installments() {
+		$minimum = $this->to_cents( $this->options['installments_minimum'] ?? 0 );
+		if ( $minimum > 0 && $this->to_cents( $this->order->get_total() ) < $minimum ) {
+			return array();
+		}
+		return $this->options['available_installments'] ?? null;
 	}
 
 	public function contains_subscription() {
