@@ -9,6 +9,8 @@
  * recording wc_create_refund.
  */
 
+require_once __DIR__ . '/stubs-wordpress.php';
+
 if ( ! function_exists( '__' ) ) {
 	function __( $text, $domain = null ) {
 		return $text;
@@ -17,30 +19,6 @@ if ( ! function_exists( '__' ) ) {
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data ) {
 		return json_encode( $data );
-	}
-}
-if ( ! function_exists( 'wc_get_logger' ) ) {
-	class Stub_Null_Logger {
-		public function log( $level, $message, $context = array() ) {}
-	}
-	function wc_get_logger() {
-		return new Stub_Null_Logger();
-	}
-}
-if ( ! class_exists( 'WP_Error' ) ) {
-	class WP_Error {
-		public $message;
-		public function __construct( $code = '', $message = '' ) {
-			$this->message = $message;
-		}
-		public function get_error_message() {
-			return $this->message;
-		}
-	}
-}
-if ( ! function_exists( 'is_wp_error' ) ) {
-	function is_wp_error( $thing ) {
-		return $thing instanceof WP_Error;
 	}
 }
 

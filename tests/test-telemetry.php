@@ -15,40 +15,18 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 	define( 'DAY_IN_SECONDS', 86400 );
 }
 
-// In-memory stand-ins for the WordPress functions the reporter touches.
-$GLOBALS['recurrente_options']  = array();
+// In-memory stand-ins for the WordPress functions the reporter touches
+// (options and the logger come from stubs-wordpress.php).
+require_once __DIR__ . '/stubs-wordpress.php';
+
 $GLOBALS['recurrente_requests'] = array();
-$GLOBALS['recurrente_logged']   = array();
 $GLOBALS['recurrente_cron']     = array();
 $GLOBALS['recurrente_http']     = null; // A callable makes wp_remote_post misbehave on purpose.
 
-if ( ! function_exists( 'get_option' ) ) {
-	function get_option( $name, $default = false ) {
-		return array_key_exists( $name, $GLOBALS['recurrente_options'] ) ? $GLOBALS['recurrente_options'][ $name ] : $default;
-	}
-}
-if ( ! function_exists( 'update_option' ) ) {
-	function update_option( $name, $value, $autoload = null ) {
-		$GLOBALS['recurrente_options'][ $name ] = $value;
-		return true;
-	}
-}
 if ( ! function_exists( 'wp_remote_post' ) ) {
 	function wp_remote_post( $url, $args ) {
 		$GLOBALS['recurrente_requests'][] = array( 'url' => $url, 'args' => $args );
 		return $GLOBALS['recurrente_http'] ? call_user_func( $GLOBALS['recurrente_http'] ) : array( 'response' => array( 'code' => 201 ) );
-	}
-}
-if ( ! function_exists( 'is_wp_error' ) ) {
-	function is_wp_error( $thing ) {
-		return $thing instanceof WP_Error;
-	}
-}
-if ( ! class_exists( 'WP_Error' ) ) {
-	class WP_Error {
-		public function get_error_message() {
-			return 'cURL error 28: connection timed out';
-		}
 	}
 }
 if ( ! function_exists( 'home_url' ) ) {
@@ -91,15 +69,6 @@ if ( ! function_exists( 'wp_clear_scheduled_hook' ) ) {
 	function wp_clear_scheduled_hook( $hook ) {
 		unset( $GLOBALS['recurrente_cron'][ $hook ] );
 		return 1;
-	}
-}
-if ( ! function_exists( 'wc_get_logger' ) ) {
-	function wc_get_logger() {
-		return new class() {
-			public function log( $level, $message, $context = array() ) {
-				$GLOBALS['recurrente_logged'][] = array( 'level' => $level, 'message' => $message );
-			}
-		};
 	}
 }
 
@@ -262,7 +231,7 @@ it( 'an error that keeps happening is reported again instead of recovered', func
 it( 'a network error is logged, not thrown', function () {
 	recurrente_telemetry_reset();
 	$GLOBALS['recurrente_http'] = function () {
-		return new WP_Error();
+		return new WP_Error( 'http_request_failed', 'cURL error 28: connection timed out' );
 	};
 	$sent = Recurrente_Telemetry::report( 'heartbeat' );
 	return true === $sent && 'error' === $GLOBALS['recurrente_logged'][0]['level']
