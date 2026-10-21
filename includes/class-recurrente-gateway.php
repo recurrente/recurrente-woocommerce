@@ -174,7 +174,9 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 	 * registration doubles as validation of the key).
 	 */
 	public function process_admin_options() {
-		$saved = parent::process_admin_options();
+		$before = $this->secret_keys();
+		$saved  = parent::process_admin_options();
+		Recurrente_Telemetry::report_removed_keys( $before, $this->secret_keys() );
 		foreach ( Recurrente_Webhook_Registrar::sync_all( $this ) as $error ) {
 			WC_Admin_Settings::add_error( $error );
 		}
@@ -293,6 +295,13 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 
 	private function client() {
 		return new Recurrente_API_Client( $this->secret_key() );
+	}
+
+	private function secret_keys() {
+		return array(
+			'test' => $this->get_option( 'test_secret_key' ),
+			'live' => $this->get_option( 'live_secret_key' ),
+		);
 	}
 
 	public function secret_key() {

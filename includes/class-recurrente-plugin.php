@@ -35,6 +35,7 @@ class Recurrente_Plugin {
 	private function load_dependencies() {
 		$dir = RECURRENTE_PLUGIN_DIR . 'includes/';
 		require_once $dir . 'class-recurrente-logger.php';
+		require_once $dir . 'class-recurrente-telemetry.php';
 		require_once $dir . 'class-recurrente-api-client.php';
 		require_once $dir . 'class-recurrente-checkout-builder.php';
 		require_once $dir . 'class-recurrente-svix-verifier.php';
@@ -50,6 +51,7 @@ class Recurrente_Plugin {
 		add_action( 'woocommerce_blocks_loaded', array( $this, 'register_blocks_support' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( RECURRENTE_PLUGIN_FILE ), array( $this, 'settings_link' ) );
 		Recurrente_Subscriptions::register_hooks();
+		Recurrente_Telemetry::register_hooks();
 	}
 
 	/** Register the gateway with the block-based checkout (WC 8.3+ default). */
