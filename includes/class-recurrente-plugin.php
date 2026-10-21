@@ -40,6 +40,8 @@ class Recurrente_Plugin {
 		require_once $dir . 'class-recurrente-checkout-builder.php';
 		require_once $dir . 'class-recurrente-svix-verifier.php';
 		require_once $dir . 'class-recurrente-webhook-registrar.php';
+		require_once $dir . 'class-recurrente-charge-order-link.php';
+		require_once $dir . 'class-recurrente-refund-sync.php';
 		require_once $dir . 'class-recurrente-webhook-handler.php';
 		require_once $dir . 'class-recurrente-subscriptions.php';
 		require_once $dir . 'class-recurrente-gateway.php';
