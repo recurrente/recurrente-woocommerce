@@ -4,11 +4,18 @@
  *
  * Webhooks are the source of truth for fulfillment — the buyer's success_url
  * return is never trusted to mark an order paid. The endpoint is public and
- * secured by the Svix signature; replays are de-duplicated by the svix-id.
+ * secured by the Svix signature; replays are de-duplicated by the svix-id,
+ * and paid events additionally by the charge's intent id (see mark_paid).
  *
- * NOTE: Test-mode payments fire simulated webhooks (payment_intent.succeeded
- * with live_mode:false) to test endpoints, so the full loop is exercisable in
- * sandbox — as long as the site has a public URL Svix can reach.
+ * Recurrente emits two event-name formats for the same charge. Accounts
+ * created after the unified format shipped receive only `intent.<status>`;
+ * older accounts receive BOTH the legacy `<type>_intent.<status>` and the
+ * unified one, as two separate Svix messages. Both are accepted here.
+ *
+ * NOTE: Test-mode payments fire simulated webhooks (`intent.succeeded` /
+ * `payment_intent.succeeded` with live_mode:false) to test endpoints, so the
+ * full loop is exercisable in sandbox — as long as the site has a public URL
+ * Svix can reach.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -20,7 +27,13 @@ class Recurrente_Webhook_Handler {
 	const NAMESPACE = 'recurrente/v1';
 	const ROUTE     = '/webhook';
 
-	const PAID_EVENTS = array( 'payment_intent.succeeded', 'bank_transfer_intent.succeeded', 'balance_intent.succeeded' );
+	/** Intent types whose legacy event names (`<type>_intent.<status>`) map onto the unified `intent.<status>`. */
+	const LEGACY_INTENT_TYPES = array( 'payment_intent', 'bank_transfer_intent', 'crypto_intent', 'balance_intent', 'cash_intent' );
+
+	const PAID_EVENT = 'intent.succeeded';
+
+	/** Order meta listing the intent ids already applied to the order, so one charge is never processed twice. */
+	const PROCESSED_INTENTS_META = '_recurrente_processed_intents';
 
 	/** Identity of the charge being processed: the intent id, or the svix-id when the payload has none. */
 	private $charge_id = '';
@@ -40,6 +53,19 @@ class Recurrente_Webhook_Handler {
 	public static function handle( WP_REST_Request $request ) {
 		$handler = new self();
 		return $handler->process( $request );
+	}
+
+	/**
+	 * Translate a legacy event name into its unified equivalent, so both spell
+	 * the same branch: `payment_intent.succeeded` → `intent.succeeded`. Names
+	 * without a legacy twin (refund.*, subscription.*, intent.*) pass through.
+	 */
+	public static function canonical_event_type( $type ) {
+		$parts = explode( '.', (string) $type, 2 );
+		if ( 2 !== count( $parts ) || ! in_array( $parts[0], self::LEGACY_INTENT_TYPES, true ) ) {
+			return $type;
+		}
+		return 'intent.' . $parts[1];
 	}
 
 	private function process( WP_REST_Request $request ) {
@@ -83,31 +109,30 @@ class Recurrente_Webhook_Handler {
 	}
 
 	private function route_event( $event ) {
-		$type  = isset( $event['event_type'] ) ? $event['event_type'] : '';
+		$type  = self::canonical_event_type( isset( $event['event_type'] ) ? $event['event_type'] : '' );
 		$order = $this->order_from( $event );
 		Recurrente_Logger::debug( 'webhook received', array( 'type' => $type, 'order' => $order ? $order->get_id() : null ) );
-		$this->apply( $type, $order );
+		$this->apply( $type, $order, $event );
 	}
 
-	private function apply( $type, $order ) {
+	private function apply( $type, $order, $event ) {
 		if ( ! $order ) {
 			return;
 		}
-		$this->run_handler( $type, $order );
+		$this->run_handler( $type, $order, $event );
 	}
 
-	private function run_handler( $type, $order ) {
+	private function run_handler( $type, $order, $event ) {
 		$handlers = $this->handlers();
-		$key      = $this->handler_key( $type );
-		if ( isset( $handlers[ $key ] ) ) {
-			call_user_func( $handlers[ $key ], $order );
+		if ( isset( $handlers[ $type ] ) ) {
+			call_user_func( $handlers[ $type ], $order, $event );
 		}
 	}
 
-	/** Paid events share one handler; subscription lifecycle events map 1:1. */
+	/** Keyed by canonical event name; subscription lifecycle events map 1:1. */
 	private function handlers() {
 		return array(
-			'paid'                  => array( $this, 'mark_paid' ),
+			self::PAID_EVENT        => array( $this, 'mark_paid' ),
 			'refund.create'         => array( $this, 'refund_order' ),
 			'subscription.create'   => array( 'Recurrente_Subscriptions', 'activate' ),
 			'subscription.cancel'   => array( 'Recurrente_Subscriptions', 'cancel' ),
@@ -117,20 +142,62 @@ class Recurrente_Webhook_Handler {
 		);
 	}
 
-	private function handler_key( $type ) {
-		return in_array( $type, self::PAID_EVENTS, true ) ? 'paid' : $type;
+	/**
+	 * Mark the order paid, once per charge. An older account gets the same
+	 * charge as two Svix messages (legacy and unified names, distinct svix-ids),
+	 * and Svix retries on top of that; the intent id is what identifies the
+	 * charge across all of them. The id is recorded AFTER the effect so a
+	 * handler that dies mid-way is retried rather than swallowed.
+	 */
+	private function mark_paid( $order, $event ) {
+		$intent_id = $this->intent_id( $event );
+		if ( $this->intent_processed( $order, $intent_id ) ) {
+			Recurrente_Logger::debug( 'paid event ignored; intent already applied', array( 'intent' => $intent_id, 'order' => $order->get_id() ) );
+			return;
+		}
+		$this->complete_payment( $order );
+		$this->record_intent( $order, $intent_id );
 	}
 
 	/**
-	 * Mark the order paid. For an already-paid subscription parent, a later paid
-	 * event is a renewal, so we delegate to the subscription handler instead.
+	 * For an already-paid subscription parent, a later paid event is a renewal,
+	 * so we delegate to the subscription handler instead.
 	 */
-	private function mark_paid( $order ) {
+	private function complete_payment( $order ) {
 		if ( $order->is_paid() ) {
 			Recurrente_Subscriptions::record_renewal( $order, $this->charge_id );
 			return;
 		}
 		$order->payment_complete( $order->get_meta( '_recurrente_checkout_id' ) );
+	}
+
+	/**
+	 * The charge's id, spelled the same in both formats: the legacy payload's
+	 * `id` is the unified payload's `legacy_id` (the unified `id` is the newer
+	 * `in_` prefixed one, so it can't be used to match the two).
+	 */
+	private function intent_id( $event ) {
+		if ( ! empty( $event['legacy_id'] ) ) {
+			return (string) $event['legacy_id'];
+		}
+		return isset( $event['id'] ) ? (string) $event['id'] : '';
+	}
+
+	private function intent_processed( $order, $intent_id ) {
+		return '' !== $intent_id && in_array( $intent_id, $this->processed_intents( $order ), true );
+	}
+
+	private function processed_intents( $order ) {
+		$ids = $order->get_meta( self::PROCESSED_INTENTS_META );
+		return is_array( $ids ) ? $ids : array();
+	}
+
+	private function record_intent( $order, $intent_id ) {
+		if ( '' === $intent_id ) {
+			return;
+		}
+		$order->update_meta_data( self::PROCESSED_INTENTS_META, array_merge( $this->processed_intents( $order ), array( $intent_id ) ) );
+		$order->save();
 	}
 
 	/**
