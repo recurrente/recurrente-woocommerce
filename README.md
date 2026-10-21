@@ -16,8 +16,8 @@ WooCommerce es dueño de la orden de punta a punta; el plugin solo aporta la pas
 pedido"**, arma un checkout de Recurrente **itemizado** a partir de los **totales reales de la orden**
 (nunca de precios del navegador, así que el total no se puede manipular) y redirige al comprador. El
 pago se marca **únicamente por webhook**, con la firma Svix verificada; el regreso del comprador por
-`success_url` nunca marca una orden como pagada. Un reembolso en Recurrente reembolsa y reabastece la
-orden.
+`success_url` nunca marca una orden como pagada. Un reembolso en Recurrente (total o parcial) reembolsa
+y reabastece la orden por el monto exacto; cada reembolso se aplica una sola vez.
 
 Soporta suscripciones (requiere **WooCommerce Subscriptions**): Recurrente es dueño del ciclo de cobro
 y sincroniza los estados por webhook. Compatible con HPOS y con el checkout por bloques (el default

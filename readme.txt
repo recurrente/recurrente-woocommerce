@@ -73,6 +73,9 @@ TEST endpoint, so your WordPress site must have a public URL to verify the compl
 
 == Changelog ==
 
+= Unreleased =
+* Fix: partial refunds in Recurrente are mirrored for their exact amount and applied once per refund id, instead of refunding the order's whole remaining balance.
+
 = 0.1.1 =
 * Fix: the checkout's back link returns to the order pay page instead of cancelling the order.
 

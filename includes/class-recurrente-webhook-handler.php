@@ -73,25 +73,28 @@ class Recurrente_Webhook_Handler {
 		$type  = isset( $event['event_type'] ) ? $event['event_type'] : '';
 		$order = $this->order_from( $event );
 		Recurrente_Logger::debug( 'webhook received', array( 'type' => $type, 'order' => $order ? $order->get_id() : null ) );
-		$this->apply( $type, $order );
+		$this->apply( $type, $order, $event );
 	}
 
-	private function apply( $type, $order ) {
+	private function apply( $type, $order, $event ) {
 		if ( ! $order ) {
 			return;
 		}
-		$this->run_handler( $type, $order );
+		$this->run_handler( $type, $order, $event );
 	}
 
-	private function run_handler( $type, $order ) {
+	private function run_handler( $type, $order, $event ) {
 		$handlers = $this->handlers();
 		$key      = $this->handler_key( $type );
 		if ( isset( $handlers[ $key ] ) ) {
-			call_user_func( $handlers[ $key ], $order );
+			call_user_func( $handlers[ $key ], $order, $event );
 		}
 	}
 
-	/** Paid events share one handler; subscription lifecycle events map 1:1. */
+	/**
+	 * Paid events share one handler; subscription lifecycle events map 1:1.
+	 * Every handler receives the order and the decoded event.
+	 */
 	private function handlers() {
 		return array(
 			'paid'                  => array( $this, 'mark_paid' ),
@@ -121,25 +124,11 @@ class Recurrente_Webhook_Handler {
 	}
 
 	/**
-	 * A refund in Recurrente refunds and restocks the WooCommerce order, the
-	 * same way the Shopify app cancels and restocks. We refund the remaining
-	 * balance, so it's idempotent against Svix's at-least-once delivery.
+	 * A refund in Recurrente refunds and restocks the WooCommerce order for
+	 * exactly the refunded amount, de-duplicated by the Recurrente refund id.
 	 */
-	private function refund_order( $order ) {
-		$remaining = $order->get_remaining_refund_amount();
-		if ( $remaining <= 0 ) {
-			return;
-		}
-		wc_create_refund( $this->refund_args( $order, $remaining ) );
-	}
-
-	private function refund_args( $order, $amount ) {
-		return array(
-			'order_id'      => $order->get_id(),
-			'amount'        => $amount,
-			'restock_items' => true,
-			'reason'        => __( 'Reembolsado en Recurrente.', 'recurrente-for-woocommerce' ),
-		);
+	private function refund_order( $order, $event ) {
+		Recurrente_Refund_Sync::apply( $order, $event );
 	}
 
 	private function order_from( $event ) {
