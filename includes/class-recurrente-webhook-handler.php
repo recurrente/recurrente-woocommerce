@@ -22,6 +22,9 @@ class Recurrente_Webhook_Handler {
 
 	const PAID_EVENTS = array( 'payment_intent.succeeded', 'bank_transfer_intent.succeeded', 'balance_intent.succeeded' );
 
+	/** Identity of the charge being processed: the intent id, or the svix-id when the payload has none. */
+	private $charge_id = '';
+
 	public static function url() {
 		return rest_url( self::NAMESPACE . self::ROUTE );
 	}
@@ -64,7 +67,17 @@ class Recurrente_Webhook_Handler {
 		if ( $this->already_processed( $svix_id ) ) {
 			return new WP_REST_Response( array( 'status' => 'duplicate' ), 200 );
 		}
-		$this->route_event( $event );
+		$this->charge_id = ! empty( $event['id'] ) ? (string) $event['id'] : (string) $svix_id;
+		return $this->route_and_mark( $event, $svix_id );
+	}
+
+	/** A charge locked by a concurrent delivery is answered 503 (not marked processed) so Svix retries it. */
+	private function route_and_mark( $event, $svix_id ) {
+		try {
+			$this->route_event( $event );
+		} catch ( Recurrente_Charge_Locked $e ) {
+			return new WP_REST_Response( array( 'status' => 'locked' ), 503 );
+		}
 		$this->mark_processed( $svix_id );
 		return new WP_REST_Response( array( 'status' => 'ok' ), 200 );
 	}
@@ -114,7 +127,7 @@ class Recurrente_Webhook_Handler {
 	 */
 	private function mark_paid( $order ) {
 		if ( $order->is_paid() ) {
-			Recurrente_Subscriptions::record_renewal( $order );
+			Recurrente_Subscriptions::record_renewal( $order, $this->charge_id );
 			return;
 		}
 		$order->payment_complete( $order->get_meta( '_recurrente_checkout_id' ) );
