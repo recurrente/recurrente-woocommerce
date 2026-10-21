@@ -41,10 +41,33 @@ class Recurrente_Charge_Order_Link {
 	 * @throws Recurrente_Charge_Locked when the lock is held by another delivery.
 	 */
 	public static function find_or_create( $charge_id, $scope, callable $create ) {
+		return self::locked( $charge_id, $scope, function () use ( $charge_id, $scope, $create ) {
+			return self::find_or_link( $charge_id, $scope, $create );
+		} );
+	}
+
+	/**
+	 * Links $charge_id to an order that already exists (the checkout's own
+	 * order receiving its first charge), under the same lock, so the parent
+	 * records its charge the way a renewal order does. Scope is empty: a first
+	 * charge belongs to exactly one order.
+	 */
+	public static function claim( $charge_id, $order ) {
+		return self::locked( $charge_id, '', function () use ( $charge_id, $order ) {
+			return self::link( $charge_id, '', $order );
+		} );
+	}
+
+	/** The charge an order was linked to, or '' when it was paid before this link existed. */
+	public static function charge_of( $order ) {
+		return (string) $order->get_meta( self::META_KEY );
+	}
+
+	private static function locked( $charge_id, $scope, callable $body ) {
 		$lock = self::lock_name( $charge_id, $scope );
 		self::acquire( $lock );
 		try {
-			return self::find_or_link( $charge_id, $scope, $create );
+			return $body();
 		} finally {
 			self::release( $lock );
 		}

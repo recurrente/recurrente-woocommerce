@@ -5,7 +5,8 @@
  * Webhooks are the source of truth for fulfillment — the buyer's success_url
  * return is never trusted to mark an order paid. The endpoint is public and
  * secured by the Svix signature; replays are de-duplicated by the svix-id,
- * and paid events additionally by the charge's intent id (see mark_paid).
+ * and paid events additionally by the charge's intent id (see mark_paid and
+ * Recurrente_Charge_Order_Link).
  *
  * Recurrente emits two event-name formats for the same charge. Accounts
  * created after the unified format shipped receive only `intent.<status>`;
@@ -32,10 +33,7 @@ class Recurrente_Webhook_Handler {
 
 	const PAID_EVENT = 'intent.succeeded';
 
-	/** Order meta listing the intent ids already applied to the order, so one charge is never processed twice. */
-	const PROCESSED_INTENTS_META = '_recurrente_processed_intents';
-
-	/** Identity of the charge being processed: the intent id, or the svix-id when the payload has none. */
+	/** Identity of the charge being processed; see charge_id_of(). */
 	private $charge_id = '';
 
 	public static function url() {
@@ -93,7 +91,7 @@ class Recurrente_Webhook_Handler {
 		if ( $this->already_processed( $svix_id ) ) {
 			return new WP_REST_Response( array( 'status' => 'duplicate' ), 200 );
 		}
-		$this->charge_id = ! empty( $event['id'] ) ? (string) $event['id'] : (string) $svix_id;
+		$this->charge_id = $this->charge_id_of( $event, $svix_id );
 		return $this->route_and_mark( $event, $svix_id );
 	}
 
@@ -145,59 +143,47 @@ class Recurrente_Webhook_Handler {
 	/**
 	 * Mark the order paid, once per charge. An older account gets the same
 	 * charge as two Svix messages (legacy and unified names, distinct svix-ids),
-	 * and Svix retries on top of that; the intent id is what identifies the
-	 * charge across all of them. The id is recorded AFTER the effect so a
-	 * handler that dies mid-way is retried rather than swallowed.
+	 * and Svix retries on top of that; the charge id identifies the charge
+	 * across all of them, and Recurrente_Charge_Order_Link is the one record of
+	 * which order each charge produced. For an already-paid subscription parent,
+	 * a different charge is a renewal, delegated to the subscription handler.
 	 */
-	private function mark_paid( $order, $event ) {
-		$intent_id = $this->intent_id( $event );
-		if ( $this->intent_processed( $order, $intent_id ) ) {
-			Recurrente_Logger::debug( 'paid event ignored; intent already applied', array( 'intent' => $intent_id, 'order' => $order->get_id() ) );
+	private function mark_paid( $order ) {
+		if ( $order->is_paid() ) {
+			$this->record_renewal_unless_first_charge( $order );
 			return;
 		}
-		$this->complete_payment( $order );
-		$this->record_intent( $order, $intent_id );
+		$this->complete_first_payment( $order );
 	}
 
-	/**
-	 * For an already-paid subscription parent, a later paid event is a renewal,
-	 * so we delegate to the subscription handler instead.
-	 */
-	private function complete_payment( $order ) {
-		if ( $order->is_paid() ) {
-			Recurrente_Subscriptions::record_renewal( $order, $this->charge_id );
-			return;
-		}
+	/** The link is written before the effect, under the charge lock, so a crash here is retried against the same order. */
+	private function complete_first_payment( $order ) {
+		Recurrente_Charge_Order_Link::claim( $this->charge_id, $order );
 		$order->payment_complete( $order->get_meta( '_recurrente_checkout_id' ) );
 	}
 
-	/**
-	 * The charge's id, spelled the same in both formats: the legacy payload's
-	 * `id` is the unified payload's `legacy_id` (the unified `id` is the newer
-	 * `in_` prefixed one, so it can't be used to match the two).
-	 */
-	private function intent_id( $event ) {
-		if ( ! empty( $event['legacy_id'] ) ) {
-			return (string) $event['legacy_id'];
-		}
-		return isset( $event['id'] ) ? (string) $event['id'] : '';
-	}
-
-	private function intent_processed( $order, $intent_id ) {
-		return '' !== $intent_id && in_array( $intent_id, $this->processed_intents( $order ), true );
-	}
-
-	private function processed_intents( $order ) {
-		$ids = $order->get_meta( self::PROCESSED_INTENTS_META );
-		return is_array( $ids ) ? $ids : array();
-	}
-
-	private function record_intent( $order, $intent_id ) {
-		if ( '' === $intent_id ) {
+	/** A paid parent receiving its own first charge again (a retry, or the legacy twin) is a no-op; any other charge is a renewal. */
+	private function record_renewal_unless_first_charge( $order ) {
+		if ( Recurrente_Charge_Order_Link::charge_of( $order ) === $this->charge_id ) {
+			Recurrente_Logger::debug( 'paid event ignored; charge already applied', array( 'charge' => $this->charge_id, 'order' => $order->get_id() ) );
 			return;
 		}
-		$order->update_meta_data( self::PROCESSED_INTENTS_META, array_merge( $this->processed_intents( $order ), array( $intent_id ) ) );
-		$order->save();
+		Recurrente_Subscriptions::record_renewal( $order, $this->charge_id );
+	}
+
+	/**
+	 * The charge's id, spelled the same in both event formats: the legacy
+	 * payload's `id` is the unified payload's `legacy_id` (the unified `id` is
+	 * the newer `in_` prefixed one, so it can't match the two). A payload
+	 * without an id falls back to the svix-id.
+	 */
+	private function charge_id_of( $event, $svix_id ) {
+		foreach ( array( 'legacy_id', 'id' ) as $key ) {
+			if ( ! empty( $event[ $key ] ) ) {
+				return (string) $event[ $key ];
+			}
+		}
+		return (string) $svix_id;
 	}
 
 	/**
