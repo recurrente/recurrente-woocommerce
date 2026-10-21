@@ -10,7 +10,8 @@
  * The class is all static so the webhook handler can call it without state.
  *
  * OPEN QUESTION (needs live verification): which event fires on a *successful
- * renewal charge*? We assume a `payment_intent.succeeded` carrying the parent
+ * renewal charge*? We assume an `intent.succeeded` (or its legacy twin
+ * `payment_intent.succeeded`) carrying the parent
  * order's metadata, handled here by record_renewal(). Confirm against a real
  * live payload before release.
  */
