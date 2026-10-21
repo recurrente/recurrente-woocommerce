@@ -3,11 +3,15 @@
  * Recurrente_Webhook_Handler tests.
  *
  * Drives a signed delivery through handle() end to end — only the WordPress
- * and WooCommerce globals are stubbed. Pins that the unified `intent.succeeded`
- * marks an order paid, and that the same charge arriving again (a Svix retry,
- * or the legacy `payment_intent.succeeded` twin an older account also gets)
- * produces no second effect: no second payment_complete, no second renewal.
+ * and WooCommerce globals are stubbed (stubs-renewals.php). Pins that the
+ * unified `intent.succeeded` marks an order paid, and that the same charge
+ * arriving again (a Svix retry, or the legacy `payment_intent.succeeded` twin
+ * an older account also gets) produces no second effect: no second
+ * payment_complete, no second renewal. Recurrente_Charge_Order_Link is the
+ * one record of which order each charge produced.
  */
+
+require_once __DIR__ . '/stubs-renewals.php';
 
 if ( ! class_exists( 'WP_REST_Request' ) ) {
 	class WP_REST_Request {
@@ -38,7 +42,6 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 
 $recurrente_test_secret     = 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw';
 $recurrente_test_transients = array();
-$recurrente_test_orders     = array();
 
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( $name ) {
@@ -58,12 +61,6 @@ if ( ! function_exists( 'set_transient' ) ) {
 		$recurrente_test_transients[ $key ] = $value;
 	}
 }
-if ( ! function_exists( 'wc_get_order' ) ) {
-	function wc_get_order( $id ) {
-		global $recurrente_test_orders;
-		return isset( $recurrente_test_orders[ $id ] ) ? $recurrente_test_orders[ $id ] : false;
-	}
-}
 if ( ! function_exists( '__' ) ) {
 	function __( $text ) {
 		return $text;
@@ -73,30 +70,7 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 	define( 'DAY_IN_SECONDS', 86400 );
 }
 
-// WooCommerce Subscriptions, stubbed just enough for a parent order to own one
-// subscription and for renewals to be counted.
-if ( ! class_exists( 'WC_Subscriptions' ) ) {
-	class WC_Subscriptions {}
-}
-class Stub_Subscription {
-	public $renewals = 0;
-}
-class Stub_Renewal_Order {
-	public function set_payment_method( $id ) {}
-	public function payment_complete() {}
-}
-if ( ! function_exists( 'wcs_get_subscriptions_for_order' ) ) {
-	function wcs_get_subscriptions_for_order( $order ) {
-		return $order->subscriptions;
-	}
-}
-if ( ! function_exists( 'wcs_create_renewal_order' ) ) {
-	function wcs_create_renewal_order( $subscription ) {
-		$subscription->renewals++;
-		return new Stub_Renewal_Order();
-	}
-}
-
+/** The checkout's own order: meta is only visible once saved, like the real store. */
 class Stub_Webhook_Order {
 	public $id;
 	public $key = 'wc_order_abc';
@@ -104,6 +78,7 @@ class Stub_Webhook_Order {
 	public $completions = array();
 	public $subscriptions = array();
 	private $meta = array( '_recurrente_checkout_id' => 'ch_test' );
+	private $pending_meta = array();
 	public function __construct( $id ) {
 		$this->id = $id;
 	}
@@ -124,21 +99,29 @@ class Stub_Webhook_Order {
 		return isset( $this->meta[ $key ] ) ? $this->meta[ $key ] : '';
 	}
 	public function update_meta_data( $key, $value ) {
-		$this->meta[ $key ] = $value;
+		$this->pending_meta[ $key ] = $value;
 	}
-	public function save() {}
+	public function save() {
+		$this->meta = array_merge( $this->meta, $this->pending_meta );
+	}
 }
 
-require_once dirname( __DIR__ ) . '/includes/class-recurrente-logger.php';
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-svix-verifier.php';
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-webhook-registrar.php';
-require_once dirname( __DIR__ ) . '/includes/class-recurrente-subscriptions.php';
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-webhook-handler.php';
 
+/** A fresh order world (no orders, free locks) holding one checkout order. */
 function recurrente_test_order( $id ) {
 	global $recurrente_test_orders;
-	$recurrente_test_orders[ $id ] = new Stub_Webhook_Order( $id );
-	return $recurrente_test_orders[ $id ];
+	recurrente_reset_renewal_world();
+	$recurrente_test_orders[] = new Stub_Webhook_Order( $id );
+	return end( $recurrente_test_orders );
+}
+
+function recurrente_test_subscription_order( $id ) {
+	$order                = recurrente_test_order( $id );
+	$order->subscriptions = array( new Stub_Subscription( 7 ) );
+	return $order;
 }
 
 /** Builds the payload Rails sends: unified events carry id + legacy_id, legacy ones only id. */
@@ -199,10 +182,10 @@ it( 'canonical_event_type leaves unified, refund and subscription names untouche
 	return true;
 } );
 
-it( 'intent.succeeded marks the order paid with its checkout id', function () {
+it( 'intent.succeeded marks the order paid with its checkout id and links it to the charge', function () {
 	$order    = recurrente_test_order( 101 );
 	$response = recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_1' ) );
-	return 200 === $response->status && $order->is_paid() && array( 'ch_test' ) === $order->completions;
+	return 200 === $response->status && $order->is_paid() && array( 'ch_test' ) === $order->completions && 'pa_1' === $order->get_meta( '_recurrente_intent_id' );
 } );
 
 it( 'the same intent.succeeded delivered again produces no second effect', function () {
@@ -216,7 +199,7 @@ it( 'the legacy payment_intent.succeeded twin of an applied charge produces no s
 	$order = recurrente_test_order( 103 );
 	recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_3' ) );
 	recurrente_test_deliver( recurrente_test_event( 'payment_intent.succeeded', $order, 'pa_3' ) );
-	return 1 === count( $order->completions ) && array( 'pa_3' ) === $order->get_meta( '_recurrente_processed_intents' );
+	return 1 === count( $order->completions ) && 'pa_3' === $order->get_meta( '_recurrente_intent_id' );
 } );
 
 it( 'legacy payment_intent.succeeded still marks an order paid on its own', function () {
@@ -226,19 +209,35 @@ it( 'legacy payment_intent.succeeded still marks an order paid on its own', func
 } );
 
 it( 'a renewal charge arriving under both names creates exactly one renewal order', function () {
-	$order                = recurrente_test_order( 105 );
-	$order->subscriptions = array( new Stub_Subscription() );
+	$order = recurrente_test_subscription_order( 105 );
 	recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_5_first' ) );
 	recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_5_renewal' ) );
 	recurrente_test_deliver( recurrente_test_event( 'payment_intent.succeeded', $order, 'pa_5_renewal' ) );
-	return 1 === count( $order->completions ) && 1 === $order->subscriptions[0]->renewals;
+	$renewals = recurrente_renewal_orders();
+	return 1 === count( $order->completions ) && 1 === count( $renewals ) && $renewals[0]->paid && 'pa_5_renewal' === $renewals[0]->get_meta( '_recurrente_intent_id' );
 } );
 
 it( 'a distinct intent on a paid subscription parent is still recorded as a renewal', function () {
-	$order                = recurrente_test_order( 106 );
-	$order->subscriptions = array( new Stub_Subscription() );
+	$order = recurrente_test_subscription_order( 106 );
 	recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_6_first' ) );
 	recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_6_second' ) );
 	recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_6_third' ) );
-	return 2 === $order->subscriptions[0]->renewals;
+	return 2 === count( recurrente_renewal_orders() );
+} );
+
+it( 'the first charge delivered again on a subscription parent creates no renewal', function () {
+	$order = recurrente_test_subscription_order( 107 );
+	recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_7' ) );
+	recurrente_test_deliver( recurrente_test_event( 'payment_intent.succeeded', $order, 'pa_7' ) );
+	return 1 === count( $order->completions ) && array() === recurrente_renewal_orders();
+} );
+
+it( 'a delivery whose charge is locked by another delivery is answered 503 and left unprocessed', function () {
+	global $wpdb;
+	$order                 = recurrente_test_order( 108 );
+	$wpdb->held_elsewhere  = array( 'recurrente_charge_' . md5( 'pa_8|' ) );
+	$response              = recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_8' ) );
+	$wpdb->held_elsewhere  = array();
+	$retry                 = recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_8' ) );
+	return 503 === $response->status && 200 === $retry->status && 1 === count( $order->completions );
 } );

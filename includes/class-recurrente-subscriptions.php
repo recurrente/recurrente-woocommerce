@@ -73,17 +73,26 @@ class Recurrente_Subscriptions {
 	/**
 	 * A paid webhook on an already-paid subscription parent is a renewal: create
 	 * the WC renewal order and complete it so WC's history mirrors Recurrente.
+	 * $charge_id (the intent id) keys the renewal, so a repeated or concurrent
+	 * delivery of the same charge reuses the order instead of creating another.
 	 */
-	public static function record_renewal( $order ) {
+	public static function record_renewal( $order, $charge_id ) {
 		foreach ( self::subscriptions_for( $order ) as $subscription ) {
-			self::create_paid_renewal( $subscription );
+			self::create_paid_renewal( $subscription, $charge_id );
 		}
 	}
 
-	private static function create_paid_renewal( $subscription ) {
+	private static function create_paid_renewal( $subscription, $charge_id ) {
+		$renewal = Recurrente_Charge_Order_Link::find_or_create( $charge_id, $subscription->get_id(), function () use ( $subscription ) {
+			return self::create_renewal( $subscription );
+		} );
+		$renewal->payment_complete();
+	}
+
+	private static function create_renewal( $subscription ) {
 		$renewal = wcs_create_renewal_order( $subscription );
 		$renewal->set_payment_method( Recurrente_Gateway::ID );
-		$renewal->payment_complete();
+		return $renewal;
 	}
 
 	private static function subscriptions_for( $order ) {
