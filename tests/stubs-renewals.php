@@ -6,6 +6,8 @@
  * and subscriptions whose renewals are created with wcs_create_renewal_order().
  */
 
+require_once __DIR__ . '/stubs-wordpress.php';
+
 if ( ! function_exists( '__' ) ) {
 	function __( $text, $domain = null ) {
 		return $text;
@@ -14,13 +16,6 @@ if ( ! function_exists( '__' ) ) {
 if ( ! function_exists( 'wp_json_encode' ) ) {
 	function wp_json_encode( $data ) {
 		return json_encode( $data );
-	}
-}
-if ( ! function_exists( 'wc_get_logger' ) ) {
-	function wc_get_logger() {
-		return new class() {
-			public function log() {}
-		};
 	}
 }
 if ( ! class_exists( 'WC_Payment_Gateway' ) ) {

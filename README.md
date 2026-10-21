@@ -38,6 +38,22 @@ Los pagos de prueba con `4242 4242 4242 4242` envían webhooks simulados con `li
 endpoint TEST. Para validar la conciliación completa, WordPress debe tener una URL pública que
 Recurrente pueda alcanzar; un sitio disponible solo en `localhost` no recibirá el webhook.
 
+## Telemetría
+
+El plugin reporta a Recurrente su propio ciclo de vida (`POST /api/plugin_events`, autenticado con
+la llave secreta de la cuenta) para que el equipo vea qué tiendas están conectadas, con qué versión
+y si algo falla:
+
+- **Conexión** al guardar una llave válida y al activar el plugin; **desconexión** al borrar una
+  llave o desactivarlo.
+- **Latido diario** (`wp_schedule_event`) con la versión del plugin. Si desde el último latido hubo
+  un error (llave rechazada, API caída, webhook con firma inválida) se reporta con su código y, al
+  siguiente latido sin errores, la recuperación.
+- Las versiones de WordPress, WooCommerce y PHP viajan en el `User-Agent` de cada reporte.
+
+Solo se envía el dominio y el nombre de la tienda: nunca montos, órdenes ni datos de compradores.
+Cada envío es no bloqueante y un fallo se registra en el log sin afectar el checkout.
+
 ## Desarrollo
 
 Requisitos: WordPress 6.0+, WooCommerce 7.0+, PHP 7.4+.

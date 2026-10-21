@@ -43,12 +43,7 @@ if ( ! class_exists( 'WP_REST_Response' ) ) {
 $recurrente_test_secret     = 'whsec_MfKQ9r8GKYqrTwjUPD8ILPZIo2LaLaSw';
 $recurrente_test_transients = array();
 
-if ( ! function_exists( 'get_option' ) ) {
-	function get_option( $name ) {
-		global $recurrente_test_secret;
-		return 'recurrente_webhook_secret_live' === $name ? $recurrente_test_secret : false;
-	}
-}
+update_option( 'recurrente_webhook_secret_live', $recurrente_test_secret );
 if ( ! function_exists( 'get_transient' ) ) {
 	function get_transient( $key ) {
 		global $recurrente_test_transients;

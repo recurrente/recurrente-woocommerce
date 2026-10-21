@@ -68,9 +68,21 @@ class Recurrente_Webhook_Handler {
 
 	private function process( WP_REST_Request $request ) {
 		if ( ! $this->verified( $request ) ) {
-			return new WP_REST_Response( array( 'error' => 'invalid signature' ), 400 );
+			return $this->reject( $request );
 		}
 		return $this->dispatch( $request );
+	}
+
+	/**
+	 * Only a delivery that carries a svix-id counts as a failed webhook for the
+	 * health report: the route is public and random bots must not look like a
+	 * broken signing secret.
+	 */
+	private function reject( WP_REST_Request $request ) {
+		if ( $request->get_header( 'svix-id' ) ) {
+			Recurrente_Telemetry::note_error( Recurrente_Telemetry::WEBHOOK_FAILED );
+		}
+		return new WP_REST_Response( array( 'error' => 'invalid signature' ), 400 );
 	}
 
 	private function verified( WP_REST_Request $request ) {

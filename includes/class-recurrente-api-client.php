@@ -87,6 +87,7 @@ class Recurrente_API_Client {
 
 	private function parse( $response ) {
 		if ( is_wp_error( $response ) ) {
+			Recurrente_Telemetry::note_error( Recurrente_Telemetry::CONNECTION_FAILED );
 			throw new Recurrente_API_Exception( esc_html( $response->get_error_message() ), 0 );
 		}
 		$status = wp_remote_retrieve_response_code( $response );
@@ -98,7 +99,13 @@ class Recurrente_API_Client {
 		if ( $status >= 200 && $status < 300 ) {
 			return is_array( $body ) ? $body : array();
 		}
+		Recurrente_Telemetry::note_error( $this->error_code( $status ) );
 		throw new Recurrente_API_Exception( esc_html( $this->error_message( $body ) ), (int) $status );
+	}
+
+	private function error_code( $status ) {
+		$rejected = in_array( (int) $status, array( 401, 403 ), true );
+		return $rejected ? Recurrente_Telemetry::AUTHENTICATION_FAILED : Recurrente_Telemetry::API_ERROR;
 	}
 
 	private function error_message( $body ) {

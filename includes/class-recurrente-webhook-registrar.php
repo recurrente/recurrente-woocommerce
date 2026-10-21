@@ -51,6 +51,7 @@ class Recurrente_Webhook_Registrar {
 			$endpoint = $client->create_webhook_endpoint( Recurrente_Webhook_Handler::url() );
 		} catch ( Recurrente_API_Exception $e ) {
 			Recurrente_Logger::error( 'webhook endpoint registration failed', array( 'mode' => $mode, 'error' => $e->getMessage() ) );
+			self::report_failure( $e, $secret_key );
 			return self::error_message( $e, $mode );
 		}
 		if ( empty( $endpoint['signingSecret'] ) ) {
@@ -59,7 +60,24 @@ class Recurrente_Webhook_Registrar {
 		}
 		self::store( $endpoint, $mode );
 		self::cleanup_stale( $client, $endpoint );
+		Recurrente_Telemetry::report( 'connected', null, $secret_key );
 		return null;
+	}
+
+	/**
+	 * Tell the dashboard the webhook could not be registered. A rejected key
+	 * can't sign its own report, so that case is left to the heartbeat (the API
+	 * client already noted it) instead of sending a request we know will 401.
+	 */
+	private static function report_failure( $e, $secret_key ) {
+		if ( self::unauthorized( $e ) ) {
+			return;
+		}
+		Recurrente_Telemetry::report( 'error', Recurrente_Telemetry::WEBHOOK_FAILED, $secret_key );
+	}
+
+	private static function unauthorized( $e ) {
+		return in_array( $e->getCode(), array( 401, 403 ), true );
 	}
 
 	private static function store( $endpoint, $mode ) {
@@ -91,7 +109,7 @@ class Recurrente_Webhook_Registrar {
 	}
 
 	private static function error_message( $e, $mode ) {
-		if ( in_array( $e->getCode(), array( 401, 403 ), true ) ) {
+		if ( self::unauthorized( $e ) ) {
 			return sprintf(
 				/* translators: %s: "pruebas" o "producción" */
 				__( 'La llave secreta de %s es inválida. Verificá que sea tu llave secreta de Recurrente (Configuración → Llaves API).', 'recurrente-for-woocommerce' ),

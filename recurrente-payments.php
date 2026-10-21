@@ -28,7 +28,12 @@ define( 'RECURRENTE_PLUGIN_VERSION', '0.1.1' );
 define( 'RECURRENTE_PLUGIN_FILE', __FILE__ );
 define( 'RECURRENTE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
+require_once RECURRENTE_PLUGIN_DIR . 'includes/class-recurrente-telemetry.php';
 require_once RECURRENTE_PLUGIN_DIR . 'includes/class-recurrente-plugin.php';
+
+// Activation and deactivation fire outside plugins_loaded, so they're wired here.
+register_activation_hook( __FILE__, array( 'Recurrente_Telemetry', 'activate' ) );
+register_deactivation_hook( __FILE__, array( 'Recurrente_Telemetry', 'deactivate' ) );
 
 // Declare HPOS (High-Performance Order Storage) and Checkout Blocks compatibility.
 add_action( 'before_woocommerce_init', function () {
