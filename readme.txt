@@ -4,7 +4,7 @@ Tags: payments, payment gateway, recurrente, guatemala, subscriptions
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 0.1.1
+Stable tag: 0.1.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -37,6 +37,12 @@ details (name, email, phone and address) and the order line items (products,
 quantities and amounts) to Recurrente, which are required to prefill and charge
 the hosted checkout. Payment notifications (webhooks) are delivered by
 Recurrente through Svix (https://www.svix.com/).
+
+The plugin also reports connection, disconnection, version and health to
+https://app.recurrente.com/api/plugin_events. These reports include the store
+name and domain, plugin version and error category; WordPress, WooCommerce and
+PHP versions are included in the User-Agent. They do not include order amounts
+or buyer data, and failures do not block checkout.
 
 * Terms of service: https://recurrente.com/terminos
 * Privacy policy: https://recurrente.com/privacidad
@@ -73,8 +79,11 @@ TEST endpoint, so your WordPress site must have a public URL to verify the compl
 
 == Changelog ==
 
-= Unreleased =
-* Fix: partial refunds in Recurrente are mirrored for their exact amount and applied once per refund id, instead of refunding the order's whole remaining balance.
+= 0.1.2 =
+* Fix: accept current intent.* payment webhooks alongside legacy payment_intent.* events.
+* Fix: deduplicate subscription renewal orders by payment attempt, including concurrent deliveries.
+* Fix: apply confirmed partial refunds for their exact amount, once per refund ID.
+* Add: report plugin connection, version and health to Recurrente without blocking checkout.
 
 = 0.1.1 =
 * Fix: the checkout's back link returns to the order pay page instead of cancelling the order.
