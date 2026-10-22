@@ -9,7 +9,7 @@
  */
 
 if ( ! defined( 'RECURRENTE_PLUGIN_VERSION' ) ) {
-	define( 'RECURRENTE_PLUGIN_VERSION', '0.1.1' );
+	define( 'RECURRENTE_PLUGIN_VERSION', '0.1.2' );
 }
 if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 	define( 'DAY_IN_SECONDS', 86400 );
@@ -116,7 +116,8 @@ it( 'payload includes error_code only for errors', function () {
 } );
 
 it( 'platform versions travel in the user agent, not in the body', function () {
-	return 1 === preg_match( '#^recurrente-woocommerce/0\.1\.1 \(WordPress/6\.6\.2; WooCommerce/unknown; PHP/[\d.]+#', Recurrente_Telemetry::user_agent() );
+	$version = preg_quote( RECURRENTE_PLUGIN_VERSION, '#' );
+	return 1 === preg_match( '#^recurrente-woocommerce/' . $version . ' \(WordPress/6\.6\.2; WooCommerce/unknown; PHP/[\d.]+#', Recurrente_Telemetry::user_agent() );
 } );
 
 // ── Transport ────────────────────────────────────────────────────────────
