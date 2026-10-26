@@ -20,8 +20,12 @@ pago se marca **únicamente por webhook**, con la firma Svix verificada; el regr
 y reabastece la orden por el monto exacto; cada reembolso se aplica una sola vez.
 
 Soporta suscripciones (requiere **WooCommerce Subscriptions**): Recurrente es dueño del ciclo de cobro
-y sincroniza los estados por webhook. Compatible con HPOS y con el checkout por bloques (el default
-desde WooCommerce 8.3), además del checkout clásico.
+y sincroniza los estados por webhook. Cada pedido admite una sola suscripción, sin productos de
+pago único ni cuota de inscripción. El total inicial debe coincidir con el total recurrente
+(incluidos impuestos, envío y cargos), o ser cero durante una prueba gratuita. Los pedidos que
+no se pueden representar exactamente se rechazan antes de crear el cliente o checkout en
+Recurrente; el comprador puede separar los productos o elegir otro método de pago. Compatible con HPOS
+y con el checkout por bloques (el default desde WooCommerce 8.3), además del checkout clásico.
 
 ## Pruebas y producción
 
