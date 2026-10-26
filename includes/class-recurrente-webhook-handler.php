@@ -113,6 +113,8 @@ class Recurrente_Webhook_Handler {
 			$this->route_event( $event );
 		} catch ( Recurrente_Charge_Locked $e ) {
 			return new WP_REST_Response( array( 'status' => 'locked' ), 503 );
+		} catch ( Recurrente_API_Exception $e ) {
+			return new WP_REST_Response( array( 'status' => 'retry' ), 503 );
 		}
 		$this->mark_processed( $svix_id );
 		return new WP_REST_Response( array( 'status' => 'ok' ), 200 );

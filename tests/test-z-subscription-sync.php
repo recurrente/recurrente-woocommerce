@@ -202,7 +202,7 @@ it( 'subscription: repeating a completed scheduled action cannot repeat the remo
 	$sub->update_status( 'cancelled' ); $job = $GLOBALS['sync_queue'][0];
 	sync_remote( 'active' ); sync_run();
 	sync_action( $job[0], ...$job[1] );
-	return 2 === count( $GLOBALS['sync_http'] ) && ! $sub->get_meta( Recurrente_Subscription_Sync::REQUEST );
+	return 2 === count( $GLOBALS['sync_http'] ) && $job[1][1] === $sub->get_meta( Recurrente_Subscription_Sync::COMPLETED );
 } );
 it( 'subscription: payment completion from a signed webhook also suppresses outbound reactivation', function () {
 	sync_world();
@@ -251,4 +251,62 @@ it( 'subscription: immediate undo of pending cancellation skips the stale pause 
 	$GLOBALS['sync_responses'] = array( sync_response( 200, array( 'status' => 'active' ) ) );
 	sync_run();
 	return 1 === count( $GLOBALS['sync_http'] ) && 'GET' === $GLOBALS['sync_http'][0][1]['method'] && ! $GLOBALS['sync_queue'];
+} );
+
+it( 'subscription: delayed activation echo cannot undo a newer pending cancellation', function () {
+	list( $order, $sub ) = sync_world();
+	$sub->update_status( 'pending-cancel' ); sync_remote( 'active' ); sync_run();
+	$sub->update_status( 'active' ); sync_remote( 'paused' ); sync_run();
+	$sub->update_status( 'pending-cancel' );
+	Recurrente_Subscriptions::reactivate( $order );
+	sync_remote( 'active' ); sync_run();
+	Recurrente_Subscriptions::on_hold( $order );
+	return 'pending-cancel' === $sub->status && ! $GLOBALS['sync_queue'];
+} );
+
+it( 'subscription: completing an older request cannot erase a concurrently saved cancellation', function () {
+	list( $order, $original ) = sync_world();
+	$sub = new class( 502 ) extends Sync_Subscription {
+		public $storage;
+		public $before_save;
+		public function save() {
+			$callback = $this->before_save;
+			$this->before_save = null;
+			if ( $callback ) { $callback(); }
+			$this->storage->meta = array_merge( $this->storage->meta, $this->pending_meta );
+			$this->saved_meta = $this->storage->meta;
+			$this->pending_meta = array();
+		}
+	};
+	$sub->storage = (object) array( 'meta' => $original->saved_meta );
+	$sub->saved_meta = $original->saved_meta;
+	$sub->status = 'active';
+	$GLOBALS['sync_subs'][502] = $sub;
+	$order->subscriptions = array( $sub );
+	$sub->update_status( 'on-hold' );
+	$producer = clone $sub;
+	$sub->before_save = function () use ( $producer ) { $producer->update_status( 'cancelled' ); };
+	sync_remote( 'active' ); sync_run();
+	$latest = $sub->storage->meta[ Recurrente_Subscription_Sync::REQUEST ];
+	if ( ! $latest || 'cancelled' !== $latest['target'] || 1 !== count( $GLOBALS['sync_queue'] ) ) { return false; }
+	sync_remote( 'paused' ); sync_run();
+	return 4 === count( $GLOBALS['sync_http'] ) && 'DELETE' === $GLOBALS['sync_http'][3][1]['method'] && ! $GLOBALS['sync_queue'];
+} );
+
+it( 'subscription: late pause echo cannot revoke access after cancellation undo has completed', function () {
+	list( $order, $sub ) = sync_world();
+	$sub->update_status( 'pending-cancel' ); sync_remote( 'active' ); sync_run();
+	$sub->update_status( 'active' ); sync_remote( 'paused' ); sync_run();
+	$GLOBALS['sync_responses'] = array( sync_response( 200, array( 'status' => 'active' ) ) );
+	Recurrente_Subscriptions::on_hold( $order );
+	return 'active' === $sub->status && 5 === count( $GLOBALS['sync_http'] ) && ! $GLOBALS['sync_queue'];
+} );
+
+it( 'subscription: a later real remote pause still reaches Woo after local unpause completed', function () {
+	list( $order, $sub ) = sync_world();
+	$sub->update_status( 'on-hold' ); sync_remote( 'active' ); sync_run();
+	$sub->update_status( 'active' ); sync_remote( 'paused' ); sync_run();
+	$GLOBALS['sync_responses'] = array( sync_response( 200, array( 'status' => 'paused' ) ) );
+	Recurrente_Subscriptions::on_hold( $order );
+	return 'on-hold' === $sub->status && 5 === count( $GLOBALS['sync_http'] ) && ! $GLOBALS['sync_queue'];
 } );

@@ -10,6 +10,7 @@ class Recurrente_Subscription_Sync {
 	const ID = '_recurrente_subscription_id';
 	const ENVIRONMENT = '_recurrente_subscription_environment';
 	const REQUEST = '_recurrente_subscription_request';
+	const COMPLETED = '_recurrente_subscription_completed_key';
 	private static $webhook_depth = 0;
 
 	public static function register_hooks() {
@@ -25,6 +26,18 @@ class Recurrente_Subscription_Sync {
 		} finally {
 			self::$webhook_depth--;
 		}
+	}
+
+	public static function webhook_status( $subscription, $status ) {
+		if ( ! $subscription->get_meta( self::REQUEST ) ) {
+			return $status;
+		}
+		$remote = self::client_for( $subscription )->get_subscription( $subscription->get_meta( self::ID ) );
+		$statuses = array( 'active' => 'active', 'paused' => 'on-hold', 'past_due' => 'on-hold', 'unable_to_start' => 'on-hold', 'cancelled' => 'cancelled' );
+		if ( ! isset( $remote['status'], $statuses[ $remote['status'] ] ) ) {
+			throw new Recurrente_API_Exception( 'Cannot reconcile the current subscription status.', 502 );
+		}
+		return $statuses[ $remote['status'] ];
 	}
 
 	/** Called only after signature/order-key validation, before first payment completion. */
@@ -105,18 +118,14 @@ class Recurrente_Subscription_Sync {
 	private static function reconcile( $subscription_id, $key, $attempt ) {
 		$subscription = wcs_get_subscription( $subscription_id );
 		$request = $subscription ? $subscription->get_meta( self::REQUEST ) : null;
-		if ( ! $request || $request['key'] !== $key || Recurrente_Gateway::ID !== $subscription->get_payment_method() ) {
+		if ( ! $request || $request['key'] !== $key || $subscription->get_meta( self::COMPLETED ) === $key || Recurrente_Gateway::ID !== $subscription->get_payment_method() ) {
 			return;
 		}
 		try {
 			self::send( $subscription, $request );
 			self::note( $subscription, 'Recurrente: cambio remoto confirmado (' . $request['target'] . ').' );
-			$current = wcs_get_subscription( $subscription_id );
-			$pending = $current->get_meta( self::REQUEST );
-			if ( $pending && $pending['key'] === $key ) {
-				$current->update_meta_data( self::REQUEST, array() );
-				$current->save();
-			}
+			$subscription->update_meta_data( self::COMPLETED, $key );
+			$subscription->save();
 		} catch ( Recurrente_API_Exception $e ) {
 			self::note( $subscription, 'Recurrente: cambio remoto sin confirmar (HTTP ' . $e->getCode() . '). Revisá el estado en Recurrente.' );
 			if ( in_array( $e->getCode(), array( 0, 408, 429 ), true ) || $e->getCode() >= 500 ) {
@@ -133,13 +142,7 @@ class Recurrente_Subscription_Sync {
 			throw new Recurrente_API_Exception( 'Unpause outcome needs manual verification.', 409 );
 		}
 		$id = $subscription->get_meta( self::ID );
-		$environment = $subscription->get_meta( self::ENVIRONMENT );
-		$settings = get_option( 'woocommerce_recurrente_settings', array() );
-		$secret = in_array( $environment, array( 'live', 'test' ), true ) && isset( $settings[ $environment . '_secret_key' ] ) ? $settings[ $environment . '_secret_key' ] : '';
-		if ( ! $id || ! $secret ) {
-			throw new Recurrente_API_Exception( 'Missing verified subscription identity or environment key.', 400 );
-		}
-		$client = new Recurrente_API_Client( $secret );
+		$client = self::client_for( $subscription );
 		$remote = $client->get_subscription( $id );
 		if ( isset( $remote['status'] ) && $remote['status'] === $request['target'] ) {
 			return;
@@ -149,6 +152,16 @@ class Recurrente_Subscription_Sync {
 			throw new Recurrente_API_Exception( 'Remote status cannot accept this transition.', 422 );
 		}
 		$client->{$methods[ $request['target'] ]}( $id, $request['key'] );
+	}
+
+	private static function client_for( $subscription ) {
+		$environment = $subscription->get_meta( self::ENVIRONMENT );
+		$settings = get_option( 'woocommerce_recurrente_settings', array() );
+		$secret = in_array( $environment, array( 'live', 'test' ), true ) && isset( $settings[ $environment . '_secret_key' ] ) ? $settings[ $environment . '_secret_key' ] : '';
+		if ( ! $subscription->get_meta( self::ID ) || ! $secret ) {
+			throw new Recurrente_API_Exception( 'Missing verified subscription identity or environment key.', 400 );
+		}
+		return new Recurrente_API_Client( $secret );
 	}
 
 	private static function note( $subscription, $message ) {

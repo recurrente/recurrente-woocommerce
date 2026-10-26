@@ -56,6 +56,7 @@ class Stub_Renewal_Order {
 	}
 	public function save() {
 		$this->saved_meta = array_merge( $this->saved_meta, $this->pending_meta );
+		$this->pending_meta = array();
 	}
 	public function set_payment_method( $method ) {
 		$this->payment_method = $method;
