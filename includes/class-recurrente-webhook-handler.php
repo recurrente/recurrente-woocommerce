@@ -211,12 +211,38 @@ class Recurrente_Webhook_Handler {
 
 	private function order_from( $event ) {
 		$metadata = isset( $event['checkout']['metadata'] ) ? $event['checkout']['metadata'] : array();
-		$order    = isset( $metadata['wc_order_id'] ) ? wc_get_order( (int) $metadata['wc_order_id'] ) : false;
+		if ( self::PAID_EVENT === self::canonical_event_type( $event['event_type'] ?? '' ) ) {
+			$metadata = $this->paid_order_metadata( $event, $metadata );
+		}
+		$id    = $metadata['wc_order_id'] ?? null;
+		$order = ( is_int( $id ) || is_string( $id ) ) && preg_match( '/^[1-9][0-9]*$/D', (string) $id ) ? wc_get_order( (int) $id ) : false;
 		return $this->valid_order( $order, $metadata );
 	}
 
+	/**
+	 * Reminder checkouts have no Woo metadata. Rails keeps the original metadata
+	 * on payment.paymentable (Subscription) in both intent formats. Never fall
+	 * back past an explicit checkout identity, even if its key is invalid.
+	 */
+	private function paid_order_metadata( $event, $metadata ) {
+		if ( is_array( $metadata ) && ( array_key_exists( 'wc_order_id', $metadata ) || array_key_exists( 'wc_order_key', $metadata ) ) ) {
+			return $metadata;
+		}
+		return $this->subscription_order_metadata( $event );
+	}
+
+	private function subscription_order_metadata( $event ) {
+		$paymentable = $event['payment']['paymentable'] ?? array();
+		$id          = $paymentable['id'] ?? null;
+		if ( 'Subscription' !== ( $paymentable['type'] ?? null ) || ! is_string( $id ) || '' === $id || $id !== ( $event['subscription']['id'] ?? null ) ) {
+			return array();
+		}
+		$metadata = $paymentable['metadata'] ?? array();
+		return is_array( $metadata ) ? $metadata : array();
+	}
+
 	private function valid_order( $order, $metadata ) {
-		if ( ! $order || ! isset( $metadata['wc_order_key'] ) ) {
+		if ( ! $order || ! isset( $metadata['wc_order_key'] ) || ! is_string( $metadata['wc_order_key'] ) ) {
 			return false;
 		}
 		return hash_equals( $order->get_order_key(), $metadata['wc_order_key'] ) ? $order : false;
