@@ -4,7 +4,7 @@ Tags: payments, payment gateway, recurrente, guatemala, subscriptions
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 0.1.2
+Stable tag: 0.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -78,6 +78,11 @@ Use card 4242 4242 4242 4242 for a successful test payment. Recurrente sends sim
 TEST endpoint, so your WordPress site must have a public URL to verify the complete order flow.
 
 == Changelog ==
+
+= 0.1.3 =
+* Fix: synchronize subscription pause and reactivation with current lifecycle webhooks.
+* Fix: reconcile reminder checkout renewal payments using verified subscription metadata.
+* Fix: retry failed local refund creation and resolve signed refunds through their original intent checkout.
 
 = 0.1.2 =
 * Fix: accept current intent.* payment webhooks alongside legacy payment_intent.* events.
