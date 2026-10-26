@@ -23,6 +23,34 @@ Soporta suscripciones (requiere **WooCommerce Subscriptions**): Recurrente es du
 y sincroniza los estados por webhook. Compatible con HPOS y con el checkout por bloques (el default
 desde WooCommerce 8.3), además del checkout clásico.
 
+## Cambios de estado de suscripciones
+
+Para suscripciones nuevas con un vínculo remoto verificado por el primer `intent.succeeded`,
+los cambios de estado de Woo se envían mediante Action Scheduler (WooCommerce → Estado →
+Acciones programadas). La nota de la suscripción distingue el cambio pendiente, confirmado o
+sin confirmar. **El estado local por sí solo no confirma que Recurrente haya dejado de cobrar.**
+
+- `on-hold` pausa Recurrente; volver de `on-hold` a `active` reanuda una suscripción remota pausada.
+  Reanudar después del período pagado puede intentar un cobro e iniciar un período nuevo.
+- `pending-cancel` y `cancelled` cancelan los cobros remotos inmediatamente, sin reembolso.
+  Woo conserva `pending-cancel` hasta terminar el plazo prepagado, incluso al recibir la
+  confirmación remota. Recurrente no ofrece cancelación al final del período en esta API.
+  **Una cancelación remota es irreversible en esta integración**: volver a `active` no recrea
+  la suscripción ni restaura los cobros; se necesita una suscripción nueva.
+- Los errores de transporte, HTTP 408, 429 y 5xx se reintentan con espera creciente (hasta una hora).
+  La reanudación usa una clave de idempotencia estable y deja de reintentarse a las 23 horas;
+  HTTP 409, otros errores 4xx o datos faltantes dejan la acción fallida y requieren revisión manual en Recurrente.
+- Se usa la llave del ambiente guardado con el pago, sin cambiarla al alternar el modo TEST/LIVE.
+  No se adivinan vínculos para suscripciones antiguas o checkouts con varias suscripciones Woo:
+  en esos casos administrá la suscripción remota directamente en Recurrente.
+
+Contrato: `GET /api/subscriptions/{id}` consulta el estado, `DELETE` cancela y `PUT` con
+`{"act":"pause"}` / `{"act":"unpause"}` pausa/reanuda. No se envían opciones de cancelación,
+prorrateo ni reembolso inventadas. A diferencia de [Stripe](https://docs.stripe.com/billing/subscriptions/cancel),
+no hay `cancel_at_period_end`; la pausa de Recurrente cambia el estado remoto, mientras que
+[pausar la cobranza de Stripe](https://docs.stripe.com/billing/subscriptions/pause-payment)
+mantiene el estado y sigue generando facturas.
+
 ## Pruebas y producción
 
 El plugin mantiene separados los dos ambientes:

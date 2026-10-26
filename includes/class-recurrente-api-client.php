@@ -60,16 +60,35 @@ class Recurrente_API_Client {
 		return $this->request( 'DELETE', '/webhook_endpoints/' . rawurlencode( $id ) );
 	}
 
+	public function get_subscription( $id ) {
+		return $this->request( 'GET', '/subscriptions/' . rawurlencode( $id ) );
+	}
+
+	public function cancel_subscription( $id, $key ) {
+		return $this->request( 'DELETE', '/subscriptions/' . rawurlencode( $id ), null, $key );
+	}
+
+	public function pause_subscription( $id, $key ) {
+		return $this->request( 'PUT', '/subscriptions/' . rawurlencode( $id ), array( 'act' => 'pause' ), $key );
+	}
+
+	public function unpause_subscription( $id, $key ) {
+		return $this->request( 'PUT', '/subscriptions/' . rawurlencode( $id ), array( 'act' => 'unpause' ), $key );
+	}
+
 	private function post( $path, array $payload ) {
 		return $this->request( 'POST', $path, $payload );
 	}
 
-	private function request( $method, $path, ?array $payload = null ) {
+	private function request( $method, $path, ?array $payload = null, $idempotency_key = null ) {
 		$args = array(
 			'method'  => $method,
 			'headers' => $this->headers(),
 			'timeout' => 30,
 		);
+		if ( null !== $idempotency_key ) {
+			$args['headers']['Idempotency-Key'] = $idempotency_key;
+		}
 		if ( null !== $payload ) {
 			$args['body'] = wp_json_encode( $payload );
 		}

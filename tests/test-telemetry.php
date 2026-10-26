@@ -51,7 +51,8 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 }
 if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	function wp_generate_uuid4() {
-		return 'uuid-' . count( $GLOBALS['recurrente_requests'] );
+		static $sequence = 0;
+		return 'uuid-' . ++$sequence;
 	}
 }
 if ( ! function_exists( 'wp_next_scheduled' ) ) {

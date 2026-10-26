@@ -29,6 +29,7 @@ if ( ! class_exists( 'WC_Payment_Gateway' ) ) {
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-logger.php';
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-gateway.php';
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-charge-order-link.php';
+require_once dirname( __DIR__ ) . '/includes/class-recurrente-subscription-sync.php';
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-subscriptions.php';
 
 /** In-memory order: meta is only visible to wc_get_orders() once saved, like the real store. */

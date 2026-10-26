@@ -135,7 +135,9 @@ class Recurrente_Webhook_Handler {
 	private function run_handler( $type, $order, $event ) {
 		$handlers = $this->handlers();
 		if ( isset( $handlers[ $type ] ) ) {
-			call_user_func( $handlers[ $type ], $order, $event );
+			Recurrente_Subscription_Sync::from_webhook( function () use ( $handlers, $type, $order, $event ) {
+				call_user_func( $handlers[ $type ], $order, $event );
+			} );
 		}
 	}
 
@@ -163,7 +165,8 @@ class Recurrente_Webhook_Handler {
 	 * which order each charge produced. For an already-paid subscription parent,
 	 * a different charge is a renewal, delegated to the subscription handler.
 	 */
-	private function mark_paid( $order ) {
+	private function mark_paid( $order, $event ) {
+		Recurrente_Subscription_Sync::capture_identity( $order, $event );
 		if ( $order->is_paid() ) {
 			$this->record_renewal_unless_first_charge( $order );
 			return;
