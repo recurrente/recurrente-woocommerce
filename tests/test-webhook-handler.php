@@ -293,7 +293,7 @@ $invalid_reminder_changes = array(
 	'malformed metadata' => function ( &$event ) { $event['payment']['paymentable']['metadata'] = 'invalid'; },
 	'explicit invalid checkout key' => function ( &$event ) { $event['checkout']['metadata'] = array( 'wc_order_id' => 203, 'wc_order_key' => 'forged' ); },
 	'partial checkout identity' => function ( &$event ) { $event['checkout']['metadata'] = array( 'wc_order_id' => 203 ); },
-	'lifecycle event' => function ( &$event ) { $event['event_type'] = 'subscription.create'; },
+	'unrelated event' => function ( &$event ) { $event['event_type'] = 'product.update'; },
 );
 foreach ( $invalid_reminder_changes as $description => $change ) {
 	it( "reminder renewal rejects {$description}", function () use ( $change ) {
