@@ -107,10 +107,12 @@ class Recurrente_Webhook_Handler {
 		return $this->route_and_mark( $event, $svix_id );
 	}
 
-	/** A charge locked by a concurrent delivery is answered 503 (not marked processed) so Svix retries it. */
+	/** Failed local refunds and locked charges stay unprocessed so Svix retries them. */
 	private function route_and_mark( $event, $svix_id ) {
 		try {
 			$this->route_event( $event );
+		} catch ( Recurrente_Refund_Failed $e ) {
+			return new WP_REST_Response( array( 'status' => 'refund failed' ), 503 );
 		} catch ( Recurrente_Charge_Locked $e ) {
 			return new WP_REST_Response( array( 'status' => 'locked' ), 503 );
 		}
@@ -232,6 +234,9 @@ class Recurrente_Webhook_Handler {
 	}
 
 	private function order_from( $event ) {
+		if ( 'refund.create' === ( $event['event_type'] ?? '' ) ) {
+			return $this->refund_order_from( $event );
+		}
 		$metadata = isset( $event['checkout']['metadata'] ) ? $event['checkout']['metadata'] : array();
 		if ( self::PAID_EVENT === self::canonical_event_type( $event['event_type'] ?? '' ) ) {
 			$metadata = $this->paid_order_metadata( $event, $metadata );
@@ -239,6 +244,18 @@ class Recurrente_Webhook_Handler {
 		$id    = $metadata['wc_order_id'] ?? null;
 		$order = ( is_int( $id ) || is_string( $id ) ) && preg_match( '/^[1-9][0-9]*$/D', (string) $id ) ? wc_get_order( (int) $id ) : false;
 		return $this->valid_order( $order, $metadata );
+	}
+
+	/** RefundSerializer nests the original intent; older flat envelopes remain supported. */
+	private function refund_order_from( $event ) {
+		$intent   = array_key_exists( 'intentable', $event ) ? $event['intentable'] : $event;
+		$metadata = $intent['checkout']['metadata'] ?? array();
+		$id       = $metadata['wc_order_id'] ?? null;
+		if ( ! ( is_int( $id ) || is_string( $id ) ) || ! preg_match( '/^[1-9][0-9]*$/D', (string) $id )
+			|| ! isset( $metadata['wc_order_key'] ) || ! is_string( $metadata['wc_order_key'] ) ) {
+			return false;
+		}
+		return $this->valid_order( wc_get_order( (int) $id ), $metadata );
 	}
 
 	/**

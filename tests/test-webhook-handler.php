@@ -133,12 +133,12 @@ function recurrente_test_event( $type, $order, $legacy_intent_id ) {
 }
 
 /** Signs the payload like Svix and delivers it through the public entry point, with a fresh svix-id each time. */
-function recurrente_test_deliver( $event ) {
+function recurrente_test_deliver( $event, $svix_id = null ) {
 	global $recurrente_test_secret;
 	static $sequence = 0;
 	$sequence++;
 	$body    = recurrente_test_json( $event );
-	$id      = 'msg_' . $sequence;
+	$id      = $svix_id ?? 'msg_' . $sequence;
 	$ts      = (string) time();
 	$key     = base64_decode( substr( $recurrente_test_secret, strlen( 'whsec_' ) ) );
 	$sig     = 'v1,' . base64_encode( hash_hmac( 'sha256', "{$id}.{$ts}.{$body}", $key, true ) );
@@ -235,6 +235,69 @@ it( 'a delivery whose charge is locked by another delivery is answered 503 and l
 	$wpdb->held_elsewhere  = array();
 	$retry                 = recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_8' ) );
 	return 503 === $response->status && 200 === $retry->status && 1 === count( $order->completions );
+} );
+
+
+class Stub_Webhook_Refundable_Order extends Stub_Refundable_Order {
+	public function get_order_key() {
+		return 'wc_order_refund';
+	}
+}
+
+/** The intentable envelope matches RefundSerializer and PaymentIntentSerializer; there is no root checkout. */
+function recurrente_signed_refund_event( $order ) {
+	$event = recurrente_refund_event();
+	$event['api_version'] = '2024-04-24';
+	$event['intentable'] = array(
+		'type' => 'PaymentIntent', 'id' => 'pa_refund_original',
+		'amount_in_cents' => 24700, 'currency' => 'GTQ',
+		'checkout' => array( 'id' => 'ch_original', 'metadata' => array(
+			'wc_order_id' => (string) $order->get_id(), 'wc_order_key' => $order->get_order_key(),
+		) ),
+	);
+	return $event;
+}
+
+it( 'signed refund: failed local mirroring returns 503 and the same delivery retries exactly once', function () {
+	recurrente_reset_renewal_world();
+	$order = new Stub_Webhook_Refundable_Order();
+	$GLOBALS['recurrente_test_orders'] = array( $order );
+	$GLOBALS['recurrente_refund_calls'] = array();
+	$GLOBALS['recurrente_refund_result'] = new WP_Error( 'temporary', 'temporary local failure' );
+	$event = recurrente_signed_refund_event( $order );
+	$id = 'msg_refund_same_delivery';
+	$failed = recurrente_test_deliver( $event, $id );
+	if ( 503 !== $failed->status || get_transient( 'recurrente_wh_' . md5( $id ) )
+		|| 0.0 !== $order->refunded || '' !== $order->get_meta( Recurrente_Refund_Sync::APPLIED_META ) ) {
+		return false;
+	}
+	$GLOBALS['recurrente_refund_result'] = null;
+	$retry = recurrente_test_deliver( $event, $id );
+	$replay = recurrente_test_deliver( $event, $id );
+	$resend = recurrente_test_deliver( $event, 'msg_refund_new_delivery' );
+	return 200 === $retry->status && 200 === $replay->status && 200 === $resend->status
+		&& 'duplicate' === $replay->data['status'] && 85.0 === $order->refunded && 1 === $order->saved
+		&& array( 're_ab12cd34' ) === $order->get_meta( Recurrente_Refund_Sync::APPLIED_META )
+		&& 2 === count( $GLOBALS['recurrente_refund_calls'] )
+		&& empty( $GLOBALS['recurrente_refund_calls'][1]['refund_payment'] );
+} );
+
+it( 'signed refund: invalid nested identity cannot use a valid root checkout instead', function () {
+	recurrente_reset_renewal_world();
+	$order = new Stub_Webhook_Refundable_Order();
+	$GLOBALS['recurrente_test_orders'] = array( $order );
+	$GLOBALS['recurrente_refund_calls'] = array();
+	$GLOBALS['recurrente_refund_result'] = null;
+	$event = recurrente_signed_refund_event( $order );
+	$event['checkout'] = $event['intentable']['checkout'];
+	foreach ( array( 'wrong-key', array( 'invalid' ), null ) as $key ) {
+		$event['intentable']['checkout']['metadata']['wc_order_key'] = $key;
+		$response = recurrente_test_deliver( $event );
+		if ( 200 !== $response->status || array() !== $GLOBALS['recurrente_refund_calls'] ) {
+			return false;
+		}
+	}
+	return 0.0 === $order->refunded;
 } );
 
 /** WooCommerce boundary: the real Recurrente_Subscriptions class performs the status transitions. */

@@ -14,6 +14,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/** Local mirroring failed; the delivery must remain retryable. */
+class Recurrente_Refund_Failed extends RuntimeException {}
+
 class Recurrente_Refund_Sync {
 
 	/** Order meta: list of Recurrente refund ids already applied. */
@@ -66,7 +69,7 @@ class Recurrente_Refund_Sync {
 		$refund = wc_create_refund( $this->refund_args() );
 		if ( is_wp_error( $refund ) ) {
 			Recurrente_Logger::error( 'refund failed', $this->context( array( 'error' => $refund->get_error_message() ) ) );
-			return;
+			throw new Recurrente_Refund_Failed( 'WooCommerce refund could not be created' );
 		}
 		$this->remember_applied();
 	}
