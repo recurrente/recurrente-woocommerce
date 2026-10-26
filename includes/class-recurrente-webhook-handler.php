@@ -120,7 +120,7 @@ class Recurrente_Webhook_Handler {
 
 	private function route_event( $event ) {
 		$type  = self::canonical_event_type( isset( $event['event_type'] ) ? $event['event_type'] : '' );
-		$order = $this->order_from( $event );
+		$order = 0 === strpos( $type, 'subscription.' ) ? $this->subscription_order_from( $event ) : $this->order_from( $event );
 		Recurrente_Logger::debug( 'webhook received', array( 'type' => $type, 'order' => $order ? $order->get_id() : null ) );
 		$this->apply( $type, $order, $event );
 	}
@@ -145,13 +145,14 @@ class Recurrente_Webhook_Handler {
 	 */
 	private function handlers() {
 		return array(
-			self::PAID_EVENT        => array( $this, 'mark_paid' ),
-			'refund.create'         => array( $this, 'refund_order' ),
-			'subscription.create'   => array( 'Recurrente_Subscriptions', 'activate' ),
-			'subscription.cancel'   => array( 'Recurrente_Subscriptions', 'cancel' ),
-			'subscription.past_due' => array( 'Recurrente_Subscriptions', 'on_hold' ),
-			'subscription.paused'   => array( 'Recurrente_Subscriptions', 'on_hold' ),
-			'subscription.unpause'  => array( 'Recurrente_Subscriptions', 'reactivate' ),
+			self::PAID_EVENT          => array( $this, 'mark_paid' ),
+			'refund.create'           => array( $this, 'refund_order' ),
+			'subscription.create'     => array( 'Recurrente_Subscriptions', 'activate' ),
+			'subscription.cancel'     => array( 'Recurrente_Subscriptions', 'cancel' ),
+			'subscription.past_due'   => array( 'Recurrente_Subscriptions', 'on_hold' ),
+			'subscription.pause'      => array( 'Recurrente_Subscriptions', 'on_hold' ),
+			'subscription.unpause'    => array( 'Recurrente_Subscriptions', 'reactivate' ),
+			'subscription.reactivate' => array( 'Recurrente_Subscriptions', 'reactivate' ),
 		);
 	}
 
@@ -207,6 +208,27 @@ class Recurrente_Webhook_Handler {
 	 */
 	private function refund_order( $order, $event ) {
 		Recurrente_Refund_Sync::apply( $order, $event );
+	}
+
+	/** SubscriptionSerializer#webhook_view has no checkout; PaymentSerializer exposes the subscription metadata on paymentable. */
+	private function subscription_order_from( $event ) {
+		$metadata = $this->subscription_metadata( $event );
+		if ( ! is_array( $metadata ) || ! isset( $metadata['wc_order_id'], $metadata['wc_order_key'] )
+			|| ! ( is_int( $metadata['wc_order_id'] ) || is_string( $metadata['wc_order_id'] ) )
+			|| ! ctype_digit( (string) $metadata['wc_order_id'] )
+			|| ! is_string( $metadata['wc_order_key'] ) ) {
+			return false;
+		}
+		return $this->valid_order( wc_get_order( (int) $metadata['wc_order_id'] ), $metadata );
+	}
+
+	/** Subscription-level order references take precedence; never bypass an invalid or partial reference with a fallback. */
+	private function subscription_metadata( $event ) {
+		$metadata = isset( $event['metadata'] ) ? $event['metadata'] : array();
+		if ( is_array( $metadata ) && ( array_key_exists( 'wc_order_id', $metadata ) || array_key_exists( 'wc_order_key', $metadata ) ) ) {
+			return $metadata;
+		}
+		return isset( $event['payment']['paymentable']['metadata'] ) ? $event['payment']['paymentable']['metadata'] : array();
 	}
 
 	private function order_from( $event ) {

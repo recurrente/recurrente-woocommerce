@@ -237,6 +237,158 @@ it( 'a delivery whose charge is locked by another delivery is answered 503 and l
 	return 503 === $response->status && 200 === $retry->status && 1 === count( $order->completions );
 } );
 
+/** WooCommerce boundary: the real Recurrente_Subscriptions class performs the status transitions. */
+class Stub_Lifecycle_Subscription extends Stub_Subscription {
+	public $status;
+	public $updates = array();
+	public function __construct( $status ) {
+		parent::__construct( 7 );
+		$this->status = $status;
+	}
+	public function has_status( $status ) {
+		return $status === $this->status;
+	}
+	public function update_status( $status, $note ) {
+		$this->status    = $status;
+		$this->updates[] = $status;
+	}
+}
+
+/** SubscriptionSerializer#webhook_view + PaymentSerializer#api_view (Rails origin/master eb1b3ae8). No checkout property. */
+function recurrente_test_lifecycle_event( $type, $order, $location ) {
+	$metadata = array( 'wc_order_id' => (string) $order->get_id(), 'wc_order_key' => $order->get_order_key() );
+	return array(
+		'event_type'              => $type,
+		'id'                      => 'su_test',
+		'api_version'             => '2024-04-24',
+		'created_at'              => '2026-10-26T12:00:00Z',
+		'customer_id'             => 'cus_test',
+		'user_id'                 => 'us_test',
+		'customer_name'           => 'Comprador de prueba',
+		'customer_email'          => 'buyer@example.com',
+		'product'                 => array( 'id' => 'prod_test' ),
+		'items'                   => array(),
+		'payment'                 => 'payment' === $location ? array(
+			'id'          => 'pay_test',
+			'paymentable' => array( 'type' => 'Subscription', 'id' => 'su_test', 'metadata' => $metadata ),
+		) : null,
+		'resumes_on'              => null,
+		'next_payment_attempt_at' => null,
+		'payment_retries'         => 0,
+		'metadata'                => 'metadata' === $location ? $metadata : array(),
+		'test_clock_id'           => null,
+	);
+}
+
+foreach ( array( 'metadata', 'payment' ) as $location ) {
+	foreach ( array(
+		'subscription.create'     => 'active',
+		'subscription.pause'      => 'on-hold',
+		'subscription.unpause'    => 'active',
+		'subscription.reactivate' => 'active',
+		'subscription.cancel'     => 'cancelled',
+		'subscription.past_due'   => 'on-hold',
+	) as $type => $expected ) {
+		it( "$type synchronizes subscriptions using $location, once per state change", function () use ( $location, $type, $expected ) {
+			$order                = recurrente_test_order( 201 );
+			$subscription         = new Stub_Lifecycle_Subscription( 'active' === $expected ? 'on-hold' : 'active' );
+			$order->subscriptions = array( $subscription );
+			$event                = recurrente_test_lifecycle_event( $type, $order, $location );
+			$response             = recurrente_test_deliver( $event );
+			recurrente_test_deliver( $event ); // Distinct Svix delivery of the same lifecycle change.
+			return 200 === $response->status && $expected === $subscription->status
+				&& array( $expected ) === $subscription->updates && ! $order->is_paid() && array() === recurrente_renewal_orders();
+		} );
+	}
+}
+
+foreach ( array( 'metadata', 'payment' ) as $location ) {
+	foreach ( array(
+		array(),
+		array( 'wc_order_id' => '201' ),
+		array( 'wc_order_key' => 'wc_order_abc' ),
+		array( 'wc_order_id' => '201', 'wc_order_key' => 'wrong_key' ),
+		array( 'wc_order_id' => '999', 'wc_order_key' => 'wc_order_abc' ),
+		array( 'wc_order_id' => '201garbage', 'wc_order_key' => 'wc_order_abc' ),
+		array( 'wc_order_id' => array( 201 ), 'wc_order_key' => 'wc_order_abc' ),
+		array( 'wc_order_id' => '201', 'wc_order_key' => array( 'wc_order_abc' ) ),
+		array( 'wc_order_id' => true, 'wc_order_key' => 'wc_order_abc' ),
+		'not metadata',
+		null,
+	) as $index => $invalid ) {
+		it( "lifecycle rejects unverified $location order reference #$index", function () use ( $location, $invalid ) {
+			$order                = recurrente_test_order( 201 );
+			$subscription         = new Stub_Lifecycle_Subscription( 'active' );
+			$order->subscriptions = array( $subscription );
+			$event                = recurrente_test_lifecycle_event( 'subscription.pause', $order, $location );
+			if ( 'metadata' === $location ) {
+				$event['metadata'] = $invalid;
+			} else {
+				$event['payment']['paymentable']['metadata'] = $invalid;
+			}
+			$response = recurrente_test_deliver( $event );
+			return 200 === $response->status && array() === $subscription->updates;
+		} );
+	}
+}
+
+it( 'subscription metadata is authoritative over a different valid payment order reference', function () {
+	global $recurrente_test_orders;
+	$order                = recurrente_test_order( 201 );
+	$subscription         = new Stub_Lifecycle_Subscription( 'active' );
+	$order->subscriptions = array( $subscription );
+	$other                = new Stub_Webhook_Order( 202 );
+	$other_subscription   = new Stub_Lifecycle_Subscription( 'active' );
+	$other->subscriptions = array( $other_subscription );
+	$recurrente_test_orders[] = $other;
+	$event                = recurrente_test_lifecycle_event( 'subscription.pause', $other, 'payment' );
+	$event['metadata']    = array( 'wc_order_id' => 201, 'wc_order_key' => $order->get_order_key() );
+	recurrente_test_deliver( $event );
+	return 'on-hold' === $subscription->status && array() === $other_subscription->updates;
+} );
+
+foreach ( array(
+	array( 'wc_order_id' => 201, 'wc_order_key' => 'wrong_key' ),
+	array( 'wc_order_id' => 201 ),
+	array( 'wc_order_id' => null ),
+) as $index => $invalid ) {
+	it( "invalid subscription reference #$index cannot fall back to valid payment metadata", function () use ( $invalid ) {
+		$order                = recurrente_test_order( 201 );
+		$subscription         = new Stub_Lifecycle_Subscription( 'active' );
+		$order->subscriptions = array( $subscription );
+		$event                = recurrente_test_lifecycle_event( 'subscription.pause', $order, 'payment' );
+		$event['metadata']    = $invalid;
+		recurrente_test_deliver( $event );
+		return array() === $subscription->updates;
+	} );
+}
+
+it( 'unrelated subscription metadata permits resolving the original checkout through payment', function () {
+	$order                = recurrente_test_order( 201 );
+	$subscription         = new Stub_Lifecycle_Subscription( 'active' );
+	$order->subscriptions = array( $subscription );
+	$event                = recurrente_test_lifecycle_event( 'subscription.pause', $order, 'payment' );
+	$event['metadata']    = array( 'merchant_reference' => 'example' );
+	recurrente_test_deliver( $event );
+	return 'on-hold' === $subscription->status;
+} );
+
+it( 'unsupported subscription.paused does not change a subscription', function () {
+	$order                = recurrente_test_order( 201 );
+	$subscription         = new Stub_Lifecycle_Subscription( 'active' );
+	$order->subscriptions = array( $subscription );
+	recurrente_test_deliver( recurrente_test_lifecycle_event( 'subscription.paused', $order, 'metadata' ) );
+	return array() === $subscription->updates;
+} );
+
+it( 'subscription metadata lookup does not expand intent order resolution', function () {
+	$order                = recurrente_test_order( 201 );
+	$event                = recurrente_test_lifecycle_event( 'intent.succeeded', $order, 'payment' );
+	$event['metadata']    = $event['payment']['paymentable']['metadata'];
+	recurrente_test_deliver( $event );
+	return ! $order->is_paid() && array() === recurrente_renewal_orders();
+} );
+
 /** Rails keeps the subscription's metadata while Intentable#checkout selects the new reminder checkout. */
 function recurrente_test_reminder_event( $type, $order, $charge ) {
 	$event = recurrente_test_event( $type, $order, $charge );
