@@ -107,10 +107,12 @@ class Recurrente_Webhook_Handler {
 		return $this->route_and_mark( $event, $svix_id );
 	}
 
-	/** A charge locked by a concurrent delivery is answered 503 (not marked processed) so Svix retries it. */
+	/** Failed local refunds and locked charges stay unprocessed so Svix retries them. */
 	private function route_and_mark( $event, $svix_id ) {
 		try {
 			$this->route_event( $event );
+		} catch ( Recurrente_Refund_Failed $e ) {
+			return new WP_REST_Response( array( 'status' => 'refund failed' ), 503 );
 		} catch ( Recurrente_Charge_Locked $e ) {
 			return new WP_REST_Response( array( 'status' => 'locked' ), 503 );
 		}

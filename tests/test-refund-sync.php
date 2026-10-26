@@ -126,12 +126,30 @@ it( 'dedupe: a different refund id on the same order is applied', function () {
 	return 1 === count( $second ) && 95.00 === $order->refunded;
 } );
 
-it( 'dedupe: a WooCommerce failure is not recorded, so a retry can apply it', function () {
+it( 'dedupe: a failed local refund propagates, retries exactly once, and later replays do nothing', function () {
 	$order = new Stub_Refundable_Order();
+	// RefundSerializer#webhook_view emits refund plus intentable, not checkout at the root.
+	$event = recurrente_refund_event();
+	$event['api_version'] = '2024-04-24';
+	$event['intentable'] = array( 'type' => 'PaymentIntent', 'id' => 'pa_ab12cd34' );
 	$GLOBALS['recurrente_refund_calls']  = array();
 	$GLOBALS['recurrente_refund_result'] = new WP_Error( 'fail', 'boom' );
-	Recurrente_Refund_Sync::apply( $order, recurrente_refund_event() );
-	return '' === $order->get_meta( Recurrente_Refund_Sync::APPLIED_META ) && 0.0 === $order->refunded;
+	try {
+		Recurrente_Refund_Sync::apply( $order, $event );
+		return false;
+	} catch ( Recurrente_Refund_Failed $e ) {
+		if ( '' !== $order->get_meta( Recurrente_Refund_Sync::APPLIED_META ) || 0.0 !== $order->refunded || 0 !== $order->saved ) {
+			return false;
+		}
+	}
+	$GLOBALS['recurrente_refund_result'] = null;
+	Recurrente_Refund_Sync::apply( $order, $event );
+	Recurrente_Refund_Sync::apply( $order, $event );
+	$calls = $GLOBALS['recurrente_refund_calls'];
+	return 2 === count( $calls ) && $calls[0] === $calls[1]
+		&& 85.00 === $calls[1]['amount'] && empty( $calls[1]['refund_payment'] )
+		&& 85.00 === $order->refunded && 1 === $order->saved
+		&& array( 're_ab12cd34' ) === $order->get_meta( Recurrente_Refund_Sync::APPLIED_META );
 } );
 
 it( 'status: a pending refund is not applied', function () {
