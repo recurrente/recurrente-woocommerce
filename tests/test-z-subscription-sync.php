@@ -78,14 +78,14 @@ it( 'subscription: signed first paid intent saves immutable remote ID, environme
 	recurrente_test_deliver( $event );
 	return 'su_ab12cd34' === $sub->get_meta( Recurrente_Subscription_Sync::ID ) && 'test' === $sub->get_meta( Recurrente_Subscription_Sync::ENVIRONMENT ) && 501 === $sub->get_meta( '_recurrente_subscription_order_id' ) && 'su_ab12cd34' === $order->get_meta( Recurrente_Subscription_Sync::ID );
 } );
-it( 'subscription: pending cancellation stops remote billing immediately using original live environment', function () {
+it( 'subscription: pending cancellation pauses remote billing and preserves prepaid access using original live environment', function () {
 	list( $order, $sub ) = sync_world();
 	$sub->update_status( 'pending-cancel' );
 	sync_remote( 'active' );
 	sync_run();
 	$request = $GLOBALS['sync_http'][1];
-	Recurrente_Subscriptions::cancel( $order );
-	return 'pending-cancel' === $sub->status && 'DELETE' === $request[1]['method'] && 'live-original' === $request[1]['headers']['X-SECRET-KEY'] && 'https://app.recurrente.com/api/subscriptions/su_ab12cd34' === $request[0] && ! isset( $request[1]['body'] );
+	Recurrente_Subscriptions::on_hold( $order );
+	return 'pending-cancel' === $sub->status && 'PUT' === $request[1]['method'] && 'live-original' === $request[1]['headers']['X-SECRET-KEY'] && 'https://app.recurrente.com/api/subscriptions/su_ab12cd34' === $request[0] && array( 'act' => 'pause' ) === json_decode( $request[1]['body'], true ) && ! $GLOBALS['sync_queue'];
 } );
 it( 'subscription: suspension and reactivation send actual pause/unpause payloads', function () {
 	list( , $sub ) = sync_world( false );
@@ -219,4 +219,36 @@ it( 'subscription: payment completion from a signed webhook also suppresses outb
 	$event['subscription'] = array( 'id' => 'su_ab12cd34' ); $event['live_mode'] = true;
 	recurrente_test_deliver( $event );
 	return 'active' === $sub->status && ! $GLOBALS['sync_queue'];
+} );
+
+it( 'subscription: pending cancellation can be reactivated without cancelling the remote subscription', function () {
+	list( $order, $sub ) = sync_world();
+	$sub->update_status( 'pending-cancel' );
+	sync_remote( 'active' ); sync_run();
+	Recurrente_Subscriptions::on_hold( $order );
+	if ( 'pending-cancel' !== $sub->status || $GLOBALS['sync_queue'] ) { return false; }
+	$sub->update_status( 'active' );
+	sync_remote( 'paused' ); sync_run();
+	Recurrente_Subscriptions::reactivate( $order );
+	$methods = array_column( array_column( $GLOBALS['sync_http'], 1 ), 'method' );
+	return array( 'GET', 'PUT', 'GET', 'PUT' ) === $methods && array( 'act' => 'unpause' ) === json_decode( $GLOBALS['sync_http'][3][1]['body'], true ) && 'active' === $sub->status && ! $GLOBALS['sync_queue'];
+} );
+it( 'subscription: Woo final cancellation after pending cancellation permanently cancels the paused remote subscription', function () {
+	list( $order, $sub ) = sync_world();
+	$sub->update_status( 'pending-cancel' );
+	sync_remote( 'active' ); sync_run();
+	Recurrente_Subscriptions::on_hold( $order );
+	$sub->update_status( 'cancelled' );
+	sync_remote( 'paused' ); sync_run();
+	Recurrente_Subscriptions::cancel( $order );
+	return 'cancelled' === $sub->status && 'DELETE' === $GLOBALS['sync_http'][3][1]['method'] && ! $GLOBALS['sync_queue'];
+} );
+it( 'subscription: immediate undo of pending cancellation skips the stale pause and does not mutate an active remote subscription', function () {
+	list( , $sub ) = sync_world();
+	$sub->update_status( 'pending-cancel' );
+	$sub->update_status( 'active' );
+	sync_run();
+	$GLOBALS['sync_responses'] = array( sync_response( 200, array( 'status' => 'active' ) ) );
+	sync_run();
+	return 1 === count( $GLOBALS['sync_http'] ) && 'GET' === $GLOBALS['sync_http'][0][1]['method'] && ! $GLOBALS['sync_queue'];
 } );

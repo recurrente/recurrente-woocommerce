@@ -32,11 +32,11 @@ sin confirmar. **El estado local por sí solo no confirma que Recurrente haya de
 
 - `on-hold` pausa Recurrente; volver de `on-hold` a `active` reanuda una suscripción remota pausada.
   Reanudar después del período pagado puede intentar un cobro e iniciar un período nuevo.
-- `pending-cancel` y `cancelled` cancelan los cobros remotos inmediatamente, sin reembolso.
-  Woo conserva `pending-cancel` hasta terminar el plazo prepagado, incluso al recibir la
-  confirmación remota. Recurrente no ofrece cancelación al final del período en esta API.
-  **Una cancelación remota es irreversible en esta integración**: volver a `active` no recrea
-  la suscripción ni restaura los cobros; se necesita una suscripción nueva.
+- `pending-cancel` pausa los cobros remotos y conserva el acceso prepagado de Woo. Volver a
+  `active` reanuda la suscripción; si ya terminó el período pagado, puede intentar un cobro.
+  Cuando Woo confirma `cancelled`, se cancela definitivamente en Recurrente, sin reembolso.
+  **La cancelación definitiva es irreversible en esta integración**: después de `cancelled`
+  se necesita una suscripción nueva. La pausa permite deshacer una cancelación pendiente.
 - Los errores de transporte, HTTP 408, 429 y 5xx se reintentan con espera creciente (hasta una hora).
   La reanudación usa una clave de idempotencia estable y deja de reintentarse a las 23 horas;
   HTTP 409, otros errores 4xx o datos faltantes dejan la acción fallida y requieren revisión manual en Recurrente.

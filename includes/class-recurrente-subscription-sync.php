@@ -67,7 +67,7 @@ class Recurrente_Subscription_Sync {
 		if ( self::$webhook_depth || Recurrente_Gateway::ID !== $subscription->get_payment_method() ) {
 			return;
 		}
-		$targets = array( 'cancelled' => 'cancelled', 'pending-cancel' => 'cancelled', 'on-hold' => 'paused', 'active' => 'active' );
+		$targets = array( 'cancelled' => 'cancelled', 'pending-cancel' => 'paused', 'on-hold' => 'paused', 'active' => 'active' );
 		if ( ! isset( $targets[ $new_status ] ) || ( 'active' === $new_status && ! in_array( $old_status, array( 'on-hold', 'pending-cancel' ), true ) ) ) {
 			return;
 		}

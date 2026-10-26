@@ -69,7 +69,7 @@ class Recurrente_Subscriptions {
 			return;
 		}
 		// Woo keeps prepaid access until its own end date after remote billing stops.
-		if ( 'cancelled' === $status && $subscription->has_status( 'pending-cancel' ) ) {
+		if ( in_array( $status, array( 'on-hold', 'cancelled' ), true ) && $subscription->has_status( 'pending-cancel' ) ) {
 			return;
 		}
 		Recurrente_Subscription_Sync::from_webhook( function () use ( $subscription, $status ) {
