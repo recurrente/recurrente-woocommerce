@@ -210,7 +210,7 @@ class Recurrente_Webhook_Handler {
 		Recurrente_Refund_Sync::apply( $order, $event );
 	}
 
-	/** SubscriptionSerializer#webhook_view has no checkout; PaymentSerializer exposes the original checkout as paymentable. */
+	/** SubscriptionSerializer#webhook_view has no checkout; PaymentSerializer exposes the subscription metadata on paymentable. */
 	private function subscription_order_from( $event ) {
 		$metadata = $this->subscription_metadata( $event );
 		if ( ! is_array( $metadata ) || ! isset( $metadata['wc_order_id'], $metadata['wc_order_key'] )

@@ -270,7 +270,7 @@ function recurrente_test_lifecycle_event( $type, $order, $location ) {
 		'items'                   => array(),
 		'payment'                 => 'payment' === $location ? array(
 			'id'          => 'pay_test',
-			'paymentable' => array( 'type' => 'Checkout', 'id' => 'ch_test', 'metadata' => $metadata ),
+			'paymentable' => array( 'type' => 'Subscription', 'id' => 'su_test', 'metadata' => $metadata ),
 		) : null,
 		'resumes_on'              => null,
 		'next_payment_attempt_at' => null,
