@@ -212,9 +212,24 @@ class Recurrente_Webhook_Handler {
 	}
 
 	private function order_from( $event ) {
+		if ( 'refund.create' === ( $event['event_type'] ?? '' ) ) {
+			return $this->refund_order_from( $event );
+		}
 		$metadata = isset( $event['checkout']['metadata'] ) ? $event['checkout']['metadata'] : array();
 		$order    = isset( $metadata['wc_order_id'] ) ? wc_get_order( (int) $metadata['wc_order_id'] ) : false;
 		return $this->valid_order( $order, $metadata );
+	}
+
+	/** RefundSerializer nests the original intent; older flat envelopes remain supported. */
+	private function refund_order_from( $event ) {
+		$intent   = array_key_exists( 'intentable', $event ) ? $event['intentable'] : $event;
+		$metadata = $intent['checkout']['metadata'] ?? array();
+		$id       = $metadata['wc_order_id'] ?? null;
+		if ( ! ( is_int( $id ) || is_string( $id ) ) || ! preg_match( '/^[1-9][0-9]*$/D', (string) $id )
+			|| ! isset( $metadata['wc_order_key'] ) || ! is_string( $metadata['wc_order_key'] ) ) {
+			return false;
+		}
+		return $this->valid_order( wc_get_order( (int) $id ), $metadata );
 	}
 
 	private function valid_order( $order, $metadata ) {
