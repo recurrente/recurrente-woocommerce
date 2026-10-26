@@ -388,3 +388,83 @@ it( 'subscription metadata lookup does not expand intent order resolution', func
 	recurrente_test_deliver( $event );
 	return ! $order->is_paid() && array() === recurrente_renewal_orders();
 } );
+
+/** Rails keeps the subscription's metadata while Intentable#checkout selects the new reminder checkout. */
+function recurrente_test_reminder_event( $type, $order, $charge ) {
+	$event = recurrente_test_event( $type, $order, $charge );
+	$event['payment'] = array(
+		'id' => 'py_original',
+		'paymentable' => array(
+			'type' => 'Subscription',
+			'id' => 'su_original',
+			'metadata' => $event['checkout']['metadata'],
+		),
+	);
+	$event['subscription'] = array( 'id' => 'su_original' );
+	$event['checkout'] = array( 'id' => 'ch_reminder', 'metadata' => array() );
+	return $event;
+}
+
+foreach ( array( 'intent.succeeded', 'payment_intent.succeeded' ) as $first_format ) {
+	it( "reminder renewal: {$first_format} and its twin/replays link exactly one paid renewal", function () use ( $first_format ) {
+		$order = recurrente_test_subscription_order( 201 );
+		recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_original' ) );
+		$other = 'intent.succeeded' === $first_format ? 'payment_intent.succeeded' : 'intent.succeeded';
+		foreach ( array( $first_format, $other, $first_format, $other ) as $type ) {
+			$response = recurrente_test_deliver( recurrente_test_reminder_event( $type, $order, 'pa_reminder' ) );
+			if ( 200 !== $response->status ) {
+				return false;
+			}
+		}
+		$renewals = recurrente_renewal_orders();
+		return 1 === count( $order->completions ) && 1 === count( $renewals ) && $renewals[0]->paid
+			&& 'pa_reminder' === $renewals[0]->get_meta( '_recurrente_intent_id' )
+			&& 'pa_original' === $order->get_meta( '_recurrente_intent_id' );
+	} );
+}
+
+it( 'reminder renewal: absent checkout metadata also resolves the original order', function () {
+	$order = recurrente_test_subscription_order( 202 );
+	recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order, 'pa_original' ) );
+	$event = recurrente_test_reminder_event( 'intent.succeeded', $order, 'pa_reminder' );
+	unset( $event['checkout']['metadata'] );
+	recurrente_test_deliver( $event );
+	return 1 === count( recurrente_renewal_orders() );
+} );
+
+$invalid_reminder_changes = array(
+	'forged order key' => function ( &$event ) { $event['payment']['paymentable']['metadata']['wc_order_key'] = 'forged'; },
+	'missing order key' => function ( &$event ) { unset( $event['payment']['paymentable']['metadata']['wc_order_key'] ); },
+	'non-string order key' => function ( &$event ) { $event['payment']['paymentable']['metadata']['wc_order_key'] = array( 'forged' ); },
+	'unknown order id' => function ( &$event ) { $event['payment']['paymentable']['metadata']['wc_order_id'] = 999999; },
+	'malformed order id' => function ( &$event ) { $event['payment']['paymentable']['metadata']['wc_order_id'] = '203forged'; },
+	'mismatched subscription id' => function ( &$event ) { $event['subscription']['id'] = 'su_other'; },
+	'missing subscription id' => function ( &$event ) { unset( $event['subscription']['id'] ); },
+	'missing paymentable id' => function ( &$event ) { unset( $event['payment']['paymentable']['id'] ); },
+	'non-subscription paymentable' => function ( &$event ) { $event['payment']['paymentable']['type'] = 'OneTimePayment'; },
+	'malformed metadata' => function ( &$event ) { $event['payment']['paymentable']['metadata'] = 'invalid'; },
+	'explicit invalid checkout key' => function ( &$event ) { $event['checkout']['metadata'] = array( 'wc_order_id' => 203, 'wc_order_key' => 'forged' ); },
+	'partial checkout identity' => function ( &$event ) { $event['checkout']['metadata'] = array( 'wc_order_id' => 203 ); },
+	'unrelated event' => function ( &$event ) { $event['event_type'] = 'product.update'; },
+);
+foreach ( $invalid_reminder_changes as $description => $change ) {
+	it( "reminder renewal rejects {$description}", function () use ( $change ) {
+		$order = recurrente_test_subscription_order( 203 );
+		$event = recurrente_test_reminder_event( 'intent.succeeded', $order, 'pa_invalid' );
+		$change( $event );
+		$response = recurrente_test_deliver( $event );
+		return 200 === $response->status && ! $order->is_paid() && array() === recurrente_renewal_orders();
+	} );
+}
+
+it( 'reminder renewal rejects an order id paired with another existing order key', function () {
+	global $recurrente_test_orders;
+	$order = recurrente_test_subscription_order( 204 );
+	$other = new Stub_Webhook_Order( 205 );
+	$other->key = 'wc_order_other';
+	$recurrente_test_orders[] = $other;
+	$event = recurrente_test_reminder_event( 'intent.succeeded', $order, 'pa_invalid' );
+	$event['payment']['paymentable']['metadata']['wc_order_key'] = $other->key;
+	recurrente_test_deliver( $event );
+	return ! $order->is_paid() && ! $other->is_paid() && array() === recurrente_renewal_orders();
+} );
