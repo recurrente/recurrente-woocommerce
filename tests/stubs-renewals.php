@@ -80,6 +80,9 @@ class Stub_Subscription {
 	public function get_id() {
 		return $this->id;
 	}
+	public function get_meta( $key ) {
+		return '';
+	}
 }
 }
 
