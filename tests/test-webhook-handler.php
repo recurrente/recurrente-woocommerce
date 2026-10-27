@@ -65,8 +65,13 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 	define( 'DAY_IN_SECONDS', 86400 );
 }
 
+if ( ! function_exists( 'wp_cache_delete' ) ) {
+	function wp_cache_delete( $id, $group ) { unset( $GLOBALS['recurrente_binding_cache'][ $group ][ $id ] ); return true; }
+}
+
 /** The checkout's own order: meta is only visible once saved, like the real store. */
 class Stub_Binding_Order_Data_Store {
+	public function get_current_class_name() { return get_class( $this ); }
 	public function read( $order ) {}
 }
 

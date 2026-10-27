@@ -19,13 +19,25 @@ class Recurrente_Order_Lock {
 		}
 	}
 
+	private static function invalidate_caches( $order_id, $store ) {
+		wp_cache_delete( $order_id, 'posts' );
+		wp_cache_delete( $order_id, 'post_meta' );
+		if ( method_exists( $store->get_current_class_name(), 'clear_cached_data' ) ) {
+			$store->clear_cached_data( array( $order_id ) );
+		}
+		if ( class_exists( '\Automattic\WooCommerce\Caches\OrderCache' ) ) {
+			wc_get_container()->get( \Automattic\WooCommerce\Caches\OrderCache::class )->remove( $order_id );
+		}
+	}
+
 	private static function reload( $order_id ) {
 		$order = wc_get_order( $order_id );
 		if ( ! $order ) {
 			throw new Recurrente_Order_Locked( 'Order unavailable.' );
 		}
-		// Woo's factory may return a cached object; reload both properties and metadata.
-		$order->get_data_store()->read( $order );
+		$store = $order->get_data_store();
+		self::invalidate_caches( $order_id, $store );
+		$store->read( $order );
 		$order->read_meta_data( true );
 		return $order;
 	}

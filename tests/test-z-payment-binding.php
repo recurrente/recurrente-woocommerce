@@ -411,3 +411,46 @@ it( 'unavailable order serialization fails closed and leaves the same webhook re
 	$retry = recurrente_test_deliver( $event, 'msg_lock_unavailable' );
 	return 503 === $response->status && ! $processed && 200 === $retry->status && $order->is_paid();
 } );
+
+
+class Stub_Binding_Cached_Order_Store extends Stub_Binding_Order_Data_Store {
+	public function clear_cached_data( $ids ) {
+		foreach ( $ids as $id ) { unset( $GLOBALS['recurrente_binding_cache']['hpos'][ $id ] ); }
+	}
+	public function read( $order ) {
+		$id = $order->get_id();
+		foreach ( array( 'posts', 'post_meta', 'hpos' ) as $group ) {
+			if ( isset( $GLOBALS['recurrente_binding_cache'][ $group ][ $id ] ) ) {
+				$order->record->paid = false;
+				return;
+			}
+		}
+		$order->record->paid = $GLOBALS['recurrente_binding_persisted_paid'];
+	}
+}
+class Stub_Binding_Cached_Payable_Order extends Stub_Binding_Payable_Order {
+	public $status_updates = array();
+	public function get_data_store() { return new Stub_Binding_Cached_Order_Store(); }
+	public function update_status( $status, $note ) { $this->status_updates[] = $status; }
+}
+
+foreach ( array( 'posts', 'post_meta', 'hpos' ) as $cache_group ) {
+	it( 'does not replace a paid checkout after waiting with stale ' . $cache_group . ' cache', function () use ( $cache_group ) {
+		global $wpdb;
+		recurrente_reset_renewal_world();
+		$order = new Stub_Binding_Cached_Payable_Order();
+		$GLOBALS['recurrente_test_orders'] = array( $order );
+		$GLOBALS['recurrente_binding_cache'] = array( $cache_group => array( 512 => 'pending' ) );
+		$GLOBALS['recurrente_binding_persisted_paid'] = false;
+		$GLOBALS['recurrente_binding_http'] = array();
+		$wpdb->on_lock = function () {
+			$GLOBALS['wpdb']->on_lock = null;
+			$GLOBALS['recurrente_binding_persisted_paid'] = true;
+		};
+		$gateway = ( new ReflectionClass( 'Stub_Binding_Gateway' ) )->newInstanceWithoutConstructor();
+		try { $response = $gateway->process_payment( 512 ); }
+		finally { $GLOBALS['recurrente_binding_cache'] = array(); }
+		return 'success' === $response['result'] && $order->received_url === $response['redirect']
+			&& $order->is_paid() && array() === $GLOBALS['recurrente_binding_http'] && array() === $order->status_updates;
+	} );
+}

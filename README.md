@@ -44,7 +44,9 @@ La creación del checkout y la validación/aplicación del webhook comparten un 
 Se recargan sus propiedades y metadata después de adquirirlo; un intento nuevo no puede reemplazar
 la identidad entre la validación y la confirmación. Si el bloqueo no está disponible, el webhook
 responde 503 sin marcarse procesado y el inicio del pago permite reintentar sin llamadas a la API.
-Una orden ya pagada vuelve a su confirmación sin abrir otro checkout. El bloqueo cubre las
+Después de adquirir el bloqueo se invalidan las cachés de post, metadatos y almacenamiento HPOS
+antes de releer la orden. Así, una solicitud que esperó con un estado viejo no vuelve a abrir
+una orden que el webhook ya pagó. Una orden ya pagada vuelve a su confirmación sin abrir otro checkout. El bloqueo cubre las
 operaciones del plugin; no serializa cambios manuales de otros plugins o del administrador.
 
 Cada intento nuevo conserva el checkout esperado, un identificador de intento en su metadata,
