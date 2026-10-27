@@ -218,12 +218,17 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 		if ( ! $builder->supported_currency() ) {
 			return $this->fail( __( 'Recurrente solo acepta GTQ y USD.', 'recurrente-for-woocommerce' ) );
 		}
-		return $this->create_and_redirect( $order, $builder );
+		try {
+			$items = $builder->items();
+		} catch ( UnexpectedValueException $e ) {
+			return $this->fail( __( 'No pudimos conciliar el total de la orden con Recurrente. Revisá la orden o elegí otro método de pago.', 'recurrente-for-woocommerce' ) );
+		}
+		return $this->create_and_redirect( $order, $items );
 	}
 
-	private function create_and_redirect( $order, $builder ) {
+	private function create_and_redirect( $order, $items ) {
 		try {
-			$checkout = $this->client()->create_checkout( $this->checkout_payload( $order, $builder ) );
+			$checkout = $this->client()->create_checkout( $this->checkout_payload( $order, $items ) );
 			return $this->redirect_to( $order, $checkout );
 		} catch ( Recurrente_API_Exception $e ) {
 			Recurrente_Logger::error( 'create_checkout failed', array( 'order' => $order->get_id(), 'error' => $e->getMessage() ) );
@@ -241,9 +246,9 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 		);
 	}
 
-	private function checkout_payload( $order, $builder ) {
+	private function checkout_payload( $order, $items ) {
 		return array_merge( $this->buyer_urls( $order ), array(
-			'items'       => $builder->items(),
+			'items'       => $items,
 			'customer_id' => $this->customer_id_for( $order ),
 			'metadata'    => array(
 				'wc_order_id'  => (string) $order->get_id(),
