@@ -81,6 +81,15 @@ el precio dinámico se hereda de la cuenta, pero no está activado en el plugin.
 monto o moneda de una orden después de crear su checkout requieren un intento nuevo. Diferencias
 rechazadas se responden 200 y no producen efectos; una nueva entrega requiere un nuevo `svix-id`.
 
+Los recordatorios con checkout distinto no recuperan automáticamente un padre que nunca se pagó.
+Las renovaciones con prorrateos, descuentos o precios cambiados solo en Recurrente, o calendarios
+separados cuyo cobro difiera del total recurrente de WooCommerce, requieren conciliación manual.
+
+Antes de conciliar manualmente, compará la referencia del pago en Recurrente con la orden y
+la suscripción en WooCommerce, el ambiente, el monto y la moneda. Si el resultado es incierto,
+contactá a soporte con esos identificadores y el mensaje del log, sin llaves ni secretos.
+No abras otro cobro solo porque el webhook no actualizó la orden.
+
 ## Telemetría
 
 El plugin reporta a Recurrente su propio ciclo de vida (`POST /api/plugin_events`, autenticado con
@@ -116,7 +125,3 @@ php tests/run.php
 ## Licencia
 
 [GPLv2 or later](LICENSE).
-
-Los recordatorios con checkout distinto no recuperan automáticamente un padre que nunca se pagó.
-Las renovaciones con prorrateos, descuentos o precios cambiados solo en Recurrente, o calendarios
-separados cuyo cobro difiera del total recurrente de WooCommerce, requieren conciliación manual.
