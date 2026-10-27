@@ -391,12 +391,14 @@ it( 'fulfillment retains the order lock and a later retry does not replace a pai
 	$GLOBALS['recurrente_binding_http'] = array();
 	$gateway = ( new ReflectionClass( 'Stub_Binding_Gateway' ) )->newInstanceWithoutConstructor();
 	$blocked = null;
+	$GLOBALS['recurrente_binding_notices'] = array();
 	$order->record->on_payment_complete = function () use ( $gateway, &$blocked ) {
 		$blocked = $gateway->process_payment( 512 );
 	};
 	$response = recurrente_test_deliver( recurrente_test_event( 'intent.succeeded', $order->record, 'pa_during_complete' ) );
 	$retry = $gateway->process_payment( 512 );
 	return 200 === $response->status && $order->is_paid() && 'failure' === $blocked['result']
+		&& array( 'Ya estamos procesando tu pago con Recurrente. Volvé a intentar en unos segundos.' ) === $GLOBALS['recurrente_binding_notices']
 		&& 'success' === $retry['result'] && array() === $GLOBALS['recurrente_binding_http'];
 } );
 

@@ -195,7 +195,8 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 				return $this->start_checkout( $order, $builder );
 			} );
 		} catch ( Recurrente_Order_Locked $e ) {
-			return $this->fail( __( 'La orden está en proceso. Intentá de nuevo.', 'recurrente-for-woocommerce' ) );
+			Recurrente_Logger::error( 'order locked by another request', array( 'order' => $order_id ) );
+			return $this->fail( __( 'Ya estamos procesando tu pago con Recurrente. Volvé a intentar en unos segundos.', 'recurrente-for-woocommerce' ) );
 		}
 	}
 
