@@ -23,6 +23,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-recurrente-order-lock.php';
+
 class Recurrente_Webhook_Handler {
 
 	const NAMESPACE = 'recurrente/v1';
@@ -35,6 +37,8 @@ class Recurrente_Webhook_Handler {
 
 	/** Identity of the charge being processed; see charge_id_of(). */
 	private $charge_id = '';
+
+	private $signing_modes = array();
 
 	public static function url() {
 		return rest_url( self::NAMESPACE . self::ROUTE );
@@ -88,17 +92,21 @@ class Recurrente_Webhook_Handler {
 	private function verified( WP_REST_Request $request ) {
 		// A delivery may be signed with the test or the live endpoint secret;
 		// both are auto-registered when the gateway settings are saved.
-		return Recurrente_Svix_Verifier::any_verifies(
-			Recurrente_Webhook_Registrar::secrets(),
+		$this->signing_modes = Recurrente_Svix_Verifier::matching_keys(
+			Recurrente_Webhook_Registrar::secrets_by_mode(),
 			$request->get_body(),
 			$request->get_header( 'svix-id' ),
 			$request->get_header( 'svix-timestamp' ),
 			$request->get_header( 'svix-signature' )
 		);
+		return 1 === count( $this->signing_modes );
 	}
 
 	private function dispatch( WP_REST_Request $request ) {
 		$event   = json_decode( $request->get_body(), true );
+		if ( ! is_array( $event ) ) {
+			return new WP_REST_Response( array( 'error' => 'invalid event' ), 400 );
+		}
 		$svix_id = $request->get_header( 'svix-id' );
 		if ( $this->already_processed( $svix_id ) ) {
 			return new WP_REST_Response( array( 'status' => 'duplicate' ), 200 );
@@ -111,6 +119,10 @@ class Recurrente_Webhook_Handler {
 	private function route_and_mark( $event, $svix_id ) {
 		try {
 			$this->route_event( $event );
+		} catch ( Recurrente_Order_Locked $e ) {
+			return new WP_REST_Response( array( 'status' => 'order locked' ), 503 );
+		} catch ( Recurrente_Payment_Binding_Unavailable $e ) {
+			return new WP_REST_Response( array( 'status' => 'payment binding unavailable' ), 503 );
 		} catch ( Recurrente_Refund_Failed $e ) {
 			return new WP_REST_Response( array( 'status' => 'refund failed' ), 503 );
 		} catch ( Recurrente_Charge_Locked $e ) {
@@ -129,6 +141,20 @@ class Recurrente_Webhook_Handler {
 
 	private function apply( $type, $order, $event ) {
 		if ( ! $order ) {
+			return;
+		}
+		Recurrente_Order_Lock::run( $order->get_id(), function ( $fresh ) use ( $type, $event ) {
+			$this->apply_locked( $type, $fresh, $event );
+		} );
+	}
+
+	private function apply_locked( $type, $order, $event ) {
+		$matched = 0 === strpos( $type, 'subscription.' ) ? $this->subscription_order_from( $event ) : $this->order_from( $event );
+		if ( ! $matched || $matched->get_id() !== $order->get_id() || ! $this->environment_matches( $order, $event ) ) {
+			return;
+		}
+		if ( self::PAID_EVENT === $type && ! $this->payment_matches( $order, $event ) ) {
+			Recurrente_Logger::error( 'payment binding mismatch', array( 'order' => $order->get_id() ) );
 			return;
 		}
 		$this->run_handler( $type, $order, $event );
@@ -166,12 +192,24 @@ class Recurrente_Webhook_Handler {
 	 * which order each charge produced. For an already-paid subscription parent,
 	 * a different charge is a renewal, delegated to the subscription handler.
 	 */
-	private function mark_paid( $order ) {
+	private function mark_paid( $order, $event ) {
+		$this->remember_identity( $order, $event );
 		if ( $order->is_paid() ) {
 			$this->record_renewal_unless_first_charge( $order );
 			return;
 		}
 		$this->complete_first_payment( $order );
+	}
+
+	private function remember_identity( $order, $event ) {
+		$binding = $order->get_meta( '_recurrente_payment_binding' );
+		if ( ! is_array( $binding ) ) {
+			$order->update_meta_data( '_recurrente_payment_binding', array( 'mode' => $this->signing_modes[0] ) );
+		}
+		if ( $this->subscription_order_metadata( $event ) ) {
+			$order->update_meta_data( '_recurrente_subscription_id', $event['subscription']['id'] );
+		}
+		$order->save();
 	}
 
 	/** The link is written before the effect, under the charge lock, so a crash here is retried against the same order. */
@@ -221,7 +259,12 @@ class Recurrente_Webhook_Handler {
 			|| ! is_string( $metadata['wc_order_key'] ) ) {
 			return false;
 		}
-		return $this->valid_order( wc_get_order( (int) $metadata['wc_order_id'] ), $metadata );
+		$order = $this->valid_order( wc_get_order( (int) $metadata['wc_order_id'] ), $metadata );
+		if ( ! $order || ! $this->attempt_matches( $order, $metadata ) ) {
+			return false;
+		}
+		$remote_id = $order->get_meta( '_recurrente_subscription_id' );
+		return '' === $remote_id || $remote_id === ( $event['id'] ?? null ) ? $order : false;
 	}
 
 	/** Subscription-level order references take precedence; never bypass an invalid or partial reference with a fallback. */
@@ -281,10 +324,139 @@ class Recurrente_Webhook_Handler {
 	}
 
 	private function valid_order( $order, $metadata ) {
-		if ( ! $order || ! isset( $metadata['wc_order_key'] ) || ! is_string( $metadata['wc_order_key'] ) ) {
+		if ( ! $order || ! is_array( $metadata ) || ! isset( $metadata['wc_order_key'] ) || ! is_string( $metadata['wc_order_key'] ) ) {
 			return false;
 		}
 		return hash_equals( $order->get_order_key(), $metadata['wc_order_key'] ) ? $order : false;
+	}
+
+	/** Endpoint identity is authoritative; settings may have changed since this order was created. */
+	private function environment_matches( $order, $event ) {
+		$mode    = $this->signing_modes[0];
+		$binding = $order->get_meta( '_recurrente_payment_binding' );
+		$intent  = $event['intentable'] ?? $event;
+		$checkout = $intent['checkout'] ?? array();
+		if ( ! is_array( $checkout ) ) {
+			return false;
+		}
+		if ( is_array( $binding ) && isset( $binding['mode'] ) && $binding['mode'] !== $mode ) {
+			return false;
+		}
+		// Root live_mode identifies Sandbox accounts, not legacy TEST-key checkouts on live accounts.
+		if ( array_key_exists( 'live_mode', $checkout ) ) {
+			return is_bool( $checkout['live_mode'] ) && $checkout['live_mode'] === ( 'live' === $mode );
+		}
+		return ! array_key_exists( 'live_mode', $intent ) || ( is_bool( $intent['live_mode'] ) && $intent['live_mode'] === ( 'live' === $mode ) );
+	}
+
+	private function payment_matches( $order, $event ) {
+		$checkout = $event['checkout'] ?? array();
+		$expected = $order->get_meta( '_recurrente_checkout_id' );
+		if ( ! is_string( $expected ) || '' === $expected || ! is_string( $checkout['id'] ?? null ) ) {
+			return false;
+		}
+		if ( $expected !== $checkout['id'] ) {
+			return $order->is_paid() && $this->renewal_matches( $order, $event );
+		}
+		if ( $order->is_paid() && Recurrente_Charge_Order_Link::charge_of( $order ) !== $this->charge_id ) {
+			return $this->renewal_matches( $order, $event );
+		}
+		return $this->first_amount_matches( $order, $event );
+	}
+
+	private function first_amount_matches( $order, $event ) {
+		$binding = $order->get_meta( '_recurrente_payment_binding' );
+		$amount  = (int) round( (float) $order->get_total() * 100 );
+		$currency = $order->get_currency();
+		if ( is_array( $binding ) && isset( $binding['amount'], $binding['currency'] ) ) {
+			if ( $amount !== $binding['amount'] || $currency !== $binding['currency'] ) {
+				return false;
+			}
+		}
+		if ( ! $this->first_subscription_matches( $order, $event ) || ! $this->attempt_matches( $order, $event['checkout']['metadata'] ?? array() ) ) {
+			return false;
+		}
+		$dynamic = is_array( $binding ) && ! empty( $binding['dynamic'] );
+		if ( $dynamic && $amount !== ( $binding['base_amount'] ?? null ) ) {
+			return false;
+		}
+		return $this->amount_matches( $event, $amount, $currency, $dynamic );
+	}
+
+	private function first_subscription_matches( $order, $event ) {
+		if ( 'Subscription' !== ( $event['payment']['paymentable']['type'] ?? null ) ) {
+			return true;
+		}
+		$metadata = $this->subscription_order_metadata( $event );
+		return $this->valid_order( $order, $metadata ) && (string) $order->get_id() === (string) ( $metadata['wc_order_id'] ?? '' )
+			&& $this->attempt_matches( $order, $metadata );
+	}
+
+	/** A different checkout is only a renewal of an already-paid, matching subscription. */
+	private function renewal_matches( $order, $event ) {
+		$metadata = $this->subscription_order_metadata( $event );
+		if ( ! $this->attempt_matches( $order, $metadata ) || ! $this->valid_order( $order, $metadata ) || (string) $order->get_id() !== (string) ( $metadata['wc_order_id'] ?? '' ) ) {
+			return false;
+		}
+		$remote_id = $order->get_meta( '_recurrente_subscription_id' );
+		if ( '' !== $remote_id && $remote_id !== $event['subscription']['id'] ) {
+			return false;
+		}
+		$subscriptions = class_exists( 'WC_Subscriptions' ) ? wcs_get_subscriptions_for_order( $order, array( 'order_type' => array( 'parent', 'renewal' ) ) ) : array();
+		$amount = 0;
+		foreach ( $subscriptions as $subscription ) {
+			if ( $subscription->get_currency() !== $order->get_currency() ) {
+				return false;
+			}
+			$amount += (int) round( (float) $subscription->get_total() * 100 );
+		}
+		if ( ! $this->legacy_renewal_environment_matches( $order ) ) {
+			return false;
+		}
+		return $subscriptions && is_int( $event['amount_in_cents'] ?? null )
+			&& $amount > 0 && $amount === $event['amount_in_cents'] && $order->get_currency() === ( $event['currency'] ?? null );
+	}
+
+	/** Never infer an old order's environment from today's gateway toggle or a new reminder. */
+	private function legacy_renewal_environment_matches( $order ) {
+		$binding = $order->get_meta( '_recurrente_payment_binding' );
+		if ( is_array( $binding ) && isset( $binding['mode'] ) ) {
+			return true;
+		}
+		$mode     = $this->signing_modes[0];
+		$settings = get_option( 'woocommerce_recurrente_settings', array() );
+		$key      = $settings[ $mode . '_secret_key' ] ?? '';
+		if ( ! $key ) {
+			throw new Recurrente_Payment_Binding_Unavailable();
+		}
+		try {
+			$client = new Recurrente_API_Client( $key );
+			$checkout = $client->get_checkout( $order->get_meta( '_recurrente_checkout_id' ) );
+		} catch ( Recurrente_API_Exception $e ) {
+			if ( 404 === $e->getCode() ) {
+				return false;
+			}
+			throw new Recurrente_Payment_Binding_Unavailable();
+		}
+		return $order->get_meta( '_recurrente_checkout_id' ) === ( $checkout['id'] ?? null )
+			&& ( 'live' === $mode ) === ( $checkout['live_mode'] ?? null );
+	}
+
+	private function attempt_matches( $order, $metadata ) {
+		$binding = $order->get_meta( '_recurrente_payment_binding' );
+		return ! is_array( $binding ) || ! isset( $binding['attempt'] )
+			|| $binding['attempt'] === ( $metadata['wc_payment_attempt'] ?? null );
+	}
+
+	/** Checkout totals include buyer surcharges; never use processor fees to guess the merchant amount. */
+	private function amount_matches( $event, $amount, $currency, $dynamic ) {
+		$charged = $event['amount_in_cents'] ?? null;
+		$checkout = $event['checkout'];
+		if ( ! is_int( $charged ) || $charged <= 0 || $currency !== ( $event['currency'] ?? null )
+			|| $currency !== ( $checkout['currency'] ?? null ) || $charged !== ( $checkout['total_in_cents'] ?? null ) ) {
+			return false;
+		}
+		return $dynamic ? $charged >= $amount : $charged === $amount;
 	}
 
 	/**
@@ -305,3 +477,6 @@ class Recurrente_Webhook_Handler {
 		return 'recurrente_wh_' . md5( (string) $svix_id );
 	}
 }
+
+/** A temporary identity lookup failure must leave the delivery retryable. */
+class Recurrente_Payment_Binding_Unavailable extends RuntimeException {}

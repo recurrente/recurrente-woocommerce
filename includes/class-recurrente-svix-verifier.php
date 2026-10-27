@@ -34,13 +34,19 @@ class Recurrente_Svix_Verifier {
 	 * (auto-registered per environment) or a manually configured one.
 	 */
 	public static function any_verifies( array $secrets, $payload, $id, $timestamp, $signature_header ) {
-		foreach ( $secrets as $secret ) {
+		return (bool) self::matching_keys( $secrets, $payload, $id, $timestamp, $signature_header );
+	}
+
+	/** Keep endpoint identity, including overlapping secrets during configuration changes. */
+	public static function matching_keys( array $secrets, $payload, $id, $timestamp, $signature_header ) {
+		$matches = array();
+		foreach ( $secrets as $key => $secret ) {
 			$verifier = new self( $secret );
 			if ( $verifier->verify( $payload, $id, $timestamp, $signature_header ) ) {
-				return true;
+				$matches[] = $key;
 			}
 		}
-		return false;
+		return $matches;
 	}
 
 	public function verify( $payload, $id, $timestamp, $signature_header ) {

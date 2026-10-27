@@ -39,10 +39,14 @@ class Recurrente_Webhook_Registrar {
 
 	/** Signing secrets captured at registration, for webhook verification. */
 	public static function secrets() {
-		return array_values( array_filter( array(
-			get_option( 'recurrente_webhook_secret_test' ),
-			get_option( 'recurrente_webhook_secret_live' ),
-		) ) );
+		return array_values( self::secrets_by_mode() );
+	}
+
+	public static function secrets_by_mode() {
+		return array_filter( array(
+			'test' => get_option( 'recurrente_webhook_secret_test' ),
+			'live' => get_option( 'recurrente_webhook_secret_live' ),
+		) );
 	}
 
 	private static function sync( $secret_key, $mode ) {
