@@ -13,9 +13,10 @@ automáticamente en WooCommerce por webhook. Para comercios en Guatemala — mon
 ## Cómo funciona
 
 WooCommerce es dueño de la orden de punta a punta; el plugin solo aporta la pasarela. Al **"Realizar
-pedido"**, arma un checkout de Recurrente **itemizado** a partir de los **totales reales de la orden**
+pedido"**, arma un checkout de Recurrente a partir de los **totales reales de la orden**
 (nunca de precios del navegador, así que el total no se puede manipular) y redirige al comprador.
 
+Normalmente conserva el detalle de productos, impuestos, envío y cargos.
 Cuando una orden de pago único incluye un cargo negativo, se envía una sola línea «Total de la
 orden» con el importe neto de WooCommerce: por ejemplo, Q100 de producto menos Q10 de ajuste cobra
 Q90. Se usa la misma representación si el redondeo de líneas difiere del total por centavos dentro
