@@ -17,8 +17,8 @@ pedido"**, arma un checkout de Recurrente a partir de los **totales reales de la
 (nunca de precios del navegador, así que el total no se puede manipular) y redirige al comprador.
 
 Normalmente conserva el detalle de productos, impuestos, envío y cargos.
-Cuando una orden de pago único incluye un cargo negativo, se envía una sola línea «Total de la
-orden» con el importe neto de WooCommerce: por ejemplo, Q100 de producto menos Q10 de ajuste cobra
+Cuando una orden de pago único incluye un cargo negativo, se envía una sola línea
+con el importe neto de WooCommerce: por ejemplo, Q100 de producto menos Q10 de ajuste cobra
 Q90. Se usa la misma representación si el redondeo de líneas difiere del total por centavos dentro
 del margen de redondeo (medio centavo por línea más medio centavo por el total). El detalle original
 se conserva en WooCommerce. Los cupones ya están incluidos en los totales de los productos y no se
