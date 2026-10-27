@@ -163,9 +163,15 @@ class Recurrente_Checkout_Builder {
 			throw new UnexpectedValueException( 'Order total does not reconcile with checkout items.' );
 		}
 		if ( $has_negative || $sum !== $total ) {
-			return array( $this->inline_item( __( 'Total de la orden', 'recurrente-for-woocommerce' ), $total, 1 ) );
+			return array( $this->inline_item( $this->order_label(), $total, 1 ) );
 		}
 		return $this->reject_zero( $items );
+	}
+
+	/** The order number the payer saw in the store, so both payer and merchant recognize the line. */
+	private function order_label() {
+		/* translators: %s: número de pedido de WooCommerce */
+		return sprintf( __( 'Pedido #%s', 'recurrente-for-woocommerce' ), $this->order->get_order_number() );
 	}
 
 	private function product_item( $item ) {

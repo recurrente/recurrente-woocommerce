@@ -65,6 +65,13 @@ if ( ! class_exists( 'WC_Order' ) ) {
 		public $items    = array();
 		public $shipping = array();
 		public $fees     = array();
+		public $notes    = array();
+		public function get_order_number() {
+			return '1042';
+		}
+		public function add_order_note( $note ) {
+			$this->notes[] = $note;
+		}
 		public function get_total() {
 			if ( null !== $this->total ) {
 				return $this->total;
@@ -189,7 +196,7 @@ it( 'negative fee: Q100 minus Q10 produces one positive Q90 item with checkout o
 	$order->total = '90.00';
 	$items = ( new Recurrente_Checkout_Builder( $order, array( 'available_installments' => array( 3 ) ) ) )->items();
 	return 1 === count( $items ) && 9000 === $items[0]['amount_in_cents'] && 1 === $items[0]['quantity']
-		&& array( 3 ) === $items[0]['available_installments'];
+		&& 'Pedido #1042' === $items[0]['name'] && array( 3 ) === $items[0]['available_installments'];
 } );
 
 it( 'tax, shipping and positive and negative fees are included exactly once', function () {

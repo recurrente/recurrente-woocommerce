@@ -221,9 +221,19 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 		try {
 			$items = $builder->items();
 		} catch ( UnexpectedValueException $e ) {
-			return $this->fail( __( 'No pudimos conciliar el total de la orden con Recurrente. Revisá la orden o elegí otro método de pago.', 'recurrente-for-woocommerce' ) );
+			return $this->reject_unreconciled( $order );
 		}
 		return $this->create_and_redirect( $order, $items );
+	}
+
+	/**
+	 * The payer can't fix a total another plugin changed, so they get a way out
+	 * and the merchant gets the explanation on the order.
+	 */
+	private function reject_unreconciled( $order ) {
+		Recurrente_Logger::error( 'order total does not reconcile', array( 'order' => $order->get_id() ) );
+		$order->add_order_note( __( 'Recurrente no inició el cobro: el total de la orden no coincide con la suma de sus productos, envío y cargos. Revisá los plugins que modifican el total.', 'recurrente-for-woocommerce' ) );
+		return $this->fail( __( 'No pudimos iniciar el pago con Recurrente. Elegí otro método de pago o contactá a la tienda.', 'recurrente-for-woocommerce' ) );
 	}
 
 	private function create_and_redirect( $order, $items ) {

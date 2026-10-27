@@ -71,8 +71,11 @@ foreach ( array( '0.00', '-10.00', '89.00', '101.00', '100.02' ) as $invalid_tot
 		$order->items = array( new Stub_Line_Item( 'Producto', 1, 100, 100 ) );
 		$order->total = $invalid_total;
 		$result = recurrente_process_test_order( $order );
+		$notice = $GLOBALS['recurrente_checkout_notices'][0];
 		return array( 'result' => 'failure' ) === $result && ! $GLOBALS['recurrente_checkout_requests']
-			&& 1 === count( $GLOBALS['recurrente_checkout_notices'] ) && ! $order->saved && ! $order->meta;
+			&& 1 === count( $GLOBALS['recurrente_checkout_notices'] ) && ! $order->saved && ! $order->meta
+			&& array( 'No pudimos iniciar el pago con Recurrente. Elegí otro método de pago o contactá a la tienda.', 'error' ) === $notice
+			&& 1 === count( $order->notes ) && false !== strpos( $order->notes[0], 'no coincide con la suma' );
 	} );
 }
 
