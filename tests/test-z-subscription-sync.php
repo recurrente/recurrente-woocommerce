@@ -17,18 +17,6 @@ function as_schedule_single_action( $at, $hook, $args, $group, $unique ) {
 function wcs_get_subscription( $id ) {
 	return isset( $GLOBALS['sync_subs'][ $id ] ) ? $GLOBALS['sync_subs'][ $id ] : false;
 }
-function wp_remote_request( $url, $args ) {
-	$GLOBALS['sync_http'][] = array( $url, $args );
-	return array_shift( $GLOBALS['sync_responses'] );
-}
-function wp_remote_retrieve_response_code( $response ) {
-	return $response['response']['code'];
-}
-function wp_remote_retrieve_body( $response ) {
-	return $response['body'];
-}
-function esc_html( $text ) { return $text; }
-
 class Sync_Subscription extends Stub_Renewal_Order {
 	public $status = 'pending';
 	public $notes = array();
@@ -44,7 +32,11 @@ class Sync_Subscription extends Stub_Renewal_Order {
 }
 
 Recurrente_Subscriptions::register_hooks();
-function sync_world( $live = true ) {
+function sync_world( $live = true, $account_live = null ) {
+	$GLOBALS['recurrente_binding_response_for_request'] = function ( $url, $args ) {
+		$GLOBALS['sync_http'][] = array( $url, $args );
+		return array_shift( $GLOBALS['sync_responses'] );
+	};
 	$GLOBALS['sync_queue'] = $GLOBALS['sync_http'] = $GLOBALS['sync_responses'] = $GLOBALS['sync_failed'] = array();
 	update_option( 'woocommerce_recurrente_settings', array( 'live_secret_key' => 'live-original', 'test_secret_key' => 'test-original', 'test_mode' => 'yes' ) );
 	$order = recurrente_test_order( 501 );
@@ -53,7 +45,10 @@ function sync_world( $live = true ) {
 	$order->subscriptions = array( $sub );
 	$event = recurrente_test_event( 'intent.succeeded', $order, 'pi_first' );
 	$event['subscription'] = array( 'id' => 'su_ab12cd34' );
-	$event['live_mode'] = $live;
+	$event['payment']['paymentable']['id'] = 'su_ab12cd34';
+	$event['live_mode'] = null === $account_live ? $live : $account_live;
+	$event['checkout']['live_mode'] = $live;
+	$GLOBALS['recurrente_test_secret'] = get_option( 'recurrente_webhook_secret_' . ( $live ? 'live' : 'test' ) );
 	recurrente_test_deliver( $event );
 	$sub->status = 'active';
 	return array( $order, $sub, $event );
@@ -169,15 +164,18 @@ it( 'subscription: first payment without a remote ID or explicit environment can
 	$other->subscriptions = array( new Sync_Subscription( 602 ) );
 	$event = recurrente_test_event( 'intent.succeeded', $other, 'pi_other' );
 	$event['subscription'] = array( 'id' => 'su_ab12cd34' );
+	$event['payment']['paymentable']['id'] = 'su_ab12cd34';
+	unset( $event['checkout']['live_mode'] );
 	recurrente_test_deliver( $event );
-	return $other->is_paid() && '' === $other->get_meta( Recurrente_Subscription_Sync::ID );
+	return $other->is_paid() && '' === $other->subscriptions[0]->get_meta( Recurrente_Subscription_Sync::ID ) && '' === $other->get_meta( Recurrente_Subscription_Sync::ENVIRONMENT );
 } );
 it( 'subscription: ambiguous multi-subscription checkouts keep the parent link without targeting any sibling', function () {
 	sync_world();
 	$order = recurrente_test_order( 701 );
 	$order->subscriptions = array( new Sync_Subscription( 702 ), new Sync_Subscription( 703 ) );
 	$event = recurrente_test_event( 'intent.succeeded', $order, 'pi_group' );
-	$event['subscription'] = array( 'id' => 'su_group123' ); $event['live_mode'] = true;
+	$event['subscription'] = array( 'id' => 'su_group123' );
+	$event['payment']['paymentable']['id'] = 'su_group123'; $event['live_mode'] = true;
 	// Boundary order supports the note used to flag the ambiguous mapping.
 	$wrapper = new class( 701 ) extends Stub_Webhook_Order {
 		public $notes = array();
@@ -216,7 +214,8 @@ it( 'subscription: payment completion from a signed webhook also suppresses outb
 	$order->subscriptions = array( $sub );
 	$GLOBALS['recurrente_test_orders'] = array( $order );
 	$event = recurrente_test_event( 'intent.succeeded', $order, 'pi_reactivate' );
-	$event['subscription'] = array( 'id' => 'su_ab12cd34' ); $event['live_mode'] = true;
+	$event['subscription'] = array( 'id' => 'su_ab12cd34' );
+	$event['payment']['paymentable']['id'] = 'su_ab12cd34'; $event['live_mode'] = true;
 	recurrente_test_deliver( $event );
 	return 'active' === $sub->status && ! $GLOBALS['sync_queue'];
 } );
@@ -309,4 +308,14 @@ it( 'subscription: a later real remote pause still reaches Woo after local unpau
 	$GLOBALS['sync_responses'] = array( sync_response( 200, array( 'status' => 'paused' ) ) );
 	Recurrente_Subscriptions::on_hold( $order );
 	return 'on-hold' === $sub->status && 5 === count( $GLOBALS['sync_http'] ) && ! $GLOBALS['sync_queue'];
+} );
+
+
+it( 'subscription: a signed TEST checkout on a live account retains TEST identity for outbound pause', function () {
+	list( $order, $sub, $event ) = sync_world( false, true );
+	$sub->update_status( 'pending-cancel' );
+	sync_remote( 'active' ); sync_run();
+	return 'test' === $sub->get_meta( Recurrente_Subscription_Sync::ENVIRONMENT )
+		&& 'test-original' === $GLOBALS['sync_http'][1][1]['headers']['X-SECRET-KEY']
+		&& 'PUT' === $GLOBALS['sync_http'][1][1]['method'];
 } );

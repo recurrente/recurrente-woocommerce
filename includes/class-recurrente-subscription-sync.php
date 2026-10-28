@@ -46,16 +46,17 @@ class Recurrente_Subscription_Sync {
 			return;
 		}
 		$id = isset( $event['subscription']['id'] ) ? $event['subscription']['id'] : null;
+		$live_mode = $event['checkout']['live_mode'] ?? ( $event['live_mode'] ?? null );
 		$first_charge = Recurrente_Charge_Order_Link::charge_of( $order );
 		$charge = isset( $event['legacy_id'] ) ? $event['legacy_id'] : ( isset( $event['id'] ) ? $event['id'] : '' );
-		if ( ! is_string( $id ) || ! preg_match( '/^su_[a-zA-Z0-9]+$/', $id ) || ! isset( $event['live_mode'] ) || ! is_bool( $event['live_mode'] ) || ( $order->is_paid() && ! $first_charge ) || ( $first_charge && $first_charge !== $charge ) ) {
+		if ( ! is_string( $id ) || ! preg_match( '/^su_[a-zA-Z0-9]+$/', $id ) || ! isset( $event['live_mode'] ) || ! is_bool( $event['live_mode'] ) || ! is_bool( $live_mode ) || ( $order->is_paid() && ! $first_charge ) || ( $first_charge && $first_charge !== $charge ) ) {
 			return;
 		}
 		$subscriptions = wcs_get_subscriptions_for_order( $order, array( 'order_type' => 'parent' ) );
 		if ( ! $subscriptions || ( $order->get_meta( self::ID ) && $order->get_meta( self::ID ) !== $id ) ) {
 			return;
 		}
-		$environment = $event['live_mode'] ? 'live' : 'test';
+		$environment = $live_mode ? 'live' : 'test';
 		self::save_identity( $order, $id, $environment );
 		// One remote subscription can aggregate several WC subscriptions. Never guess a sibling mapping.
 		if ( 1 !== count( $subscriptions ) ) {

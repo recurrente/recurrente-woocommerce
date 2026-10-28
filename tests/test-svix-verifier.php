@@ -86,3 +86,11 @@ it( 'any_verifies rejects when no secret matches', function () use ( $other, $pa
 it( 'any_verifies rejects with an empty secret list', function () use ( $payload, $id, $now, $sign ) {
 	return false === Recurrente_Svix_Verifier::any_verifies( array(), $payload, $id, $now, 'v1,' . $sign( $now ) );
 } );
+
+it( 'matching_keys preserves the signing environment', function () use ( $secret, $other, $payload, $id, $now, $sign ) {
+	return array( 'live' ) === Recurrente_Svix_Verifier::matching_keys( array( 'test' => $other, 'live' => $secret ), $payload, $id, $now, 'v1,' . $sign( $now ) );
+} );
+
+it( 'matching_keys exposes ambiguous environment secrets instead of choosing the first', function () use ( $secret, $payload, $id, $now, $sign ) {
+	return array( 'test', 'live' ) === Recurrente_Svix_Verifier::matching_keys( array( 'test' => $secret, 'live' => $secret ), $payload, $id, $now, 'v1,' . $sign( $now ) );
+} );
