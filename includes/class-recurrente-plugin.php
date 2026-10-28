@@ -43,6 +43,7 @@ class Recurrente_Plugin {
 		require_once $dir . 'class-recurrente-charge-order-link.php';
 		require_once $dir . 'class-recurrente-refund-sync.php';
 		require_once $dir . 'class-recurrente-webhook-handler.php';
+		require_once $dir . 'class-recurrente-subscription-sync.php';
 		require_once $dir . 'class-recurrente-subscriptions.php';
 		require_once $dir . 'class-recurrente-gateway.php';
 	}

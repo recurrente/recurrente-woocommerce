@@ -29,6 +29,7 @@ if ( ! class_exists( 'WC_Payment_Gateway' ) ) {
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-logger.php';
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-gateway.php';
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-charge-order-link.php';
+require_once dirname( __DIR__ ) . '/includes/class-recurrente-subscription-sync.php';
 require_once dirname( __DIR__ ) . '/includes/class-recurrente-subscriptions.php';
 
 /** In-memory order: meta is only visible to wc_get_orders() once saved, like the real store. */
@@ -55,6 +56,7 @@ class Stub_Renewal_Order {
 	}
 	public function save() {
 		$this->saved_meta = array_merge( $this->saved_meta, $this->pending_meta );
+		$this->pending_meta = array();
 	}
 	public function set_payment_method( $method ) {
 		$this->payment_method = $method;
@@ -83,6 +85,9 @@ class Stub_Subscription {
 	}
 	public function get_id() {
 		return $this->id;
+	}
+	public function get_meta( $key ) {
+		return '';
 	}
 }
 }

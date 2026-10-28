@@ -127,6 +127,8 @@ class Recurrente_Webhook_Handler {
 			return new WP_REST_Response( array( 'status' => 'refund failed' ), 503 );
 		} catch ( Recurrente_Charge_Locked $e ) {
 			return new WP_REST_Response( array( 'status' => 'locked' ), 503 );
+		} catch ( Recurrente_API_Exception $e ) {
+			return new WP_REST_Response( array( 'status' => 'retry' ), 503 );
 		}
 		$this->mark_processed( $svix_id );
 		return new WP_REST_Response( array( 'status' => 'ok' ), 200 );
@@ -163,7 +165,9 @@ class Recurrente_Webhook_Handler {
 	private function run_handler( $type, $order, $event ) {
 		$handlers = $this->handlers();
 		if ( isset( $handlers[ $type ] ) ) {
-			call_user_func( $handlers[ $type ], $order, $event );
+			Recurrente_Subscription_Sync::from_webhook( function () use ( $handlers, $type, $order, $event ) {
+				call_user_func( $handlers[ $type ], $order, $event );
+			} );
 		}
 	}
 
@@ -193,6 +197,7 @@ class Recurrente_Webhook_Handler {
 	 * a different charge is a renewal, delegated to the subscription handler.
 	 */
 	private function mark_paid( $order, $event ) {
+		Recurrente_Subscription_Sync::capture_identity( $order, $event );
 		$this->remember_identity( $order, $event );
 		if ( $order->is_paid() ) {
 			$this->record_renewal_unless_first_charge( $order );

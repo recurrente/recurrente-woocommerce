@@ -202,6 +202,9 @@ class Stub_Binding_Payable_Order extends WC_Order {
 }
 
 function wp_remote_request( $url, $args ) {
+	if ( isset( $GLOBALS['recurrente_binding_response_for_request'] ) ) {
+		return call_user_func( $GLOBALS['recurrente_binding_response_for_request'], $url, $args );
+	}
 	if ( ! empty( $GLOBALS['recurrente_binding_on_http'] ) ) { call_user_func( $GLOBALS['recurrente_binding_on_http'] ); }
 	$GLOBALS['recurrente_binding_http'][] = array( $url, $args );
 	$GLOBALS['recurrente_requests'][] = array( 'url' => $url, 'args' => $args );

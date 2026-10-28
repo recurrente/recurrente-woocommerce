@@ -26,6 +26,7 @@ class Recurrente_Subscriptions {
 		if ( ! self::active() ) {
 			return;
 		}
+		Recurrente_Subscription_Sync::register_hooks();
 		add_action( 'woocommerce_scheduled_subscription_payment_' . Recurrente_Gateway::ID, array( __CLASS__, 'skip_scheduled_payment' ) );
 	}
 
@@ -67,7 +68,17 @@ class Recurrente_Subscriptions {
 		if ( $subscription->has_status( $status ) ) {
 			return;
 		}
-		$subscription->update_status( $status, __( 'Actualizado por webhook de Recurrente.', 'recurrente-for-woocommerce' ) );
+		// Woo keeps prepaid access until its own end date after remote billing stops.
+		if ( $subscription->has_status( 'pending-cancel' ) ) {
+			return;
+		}
+		$status = Recurrente_Subscription_Sync::webhook_status( $subscription, $status );
+		if ( $subscription->has_status( $status ) ) {
+			return;
+		}
+		Recurrente_Subscription_Sync::from_webhook( function () use ( $subscription, $status ) {
+			$subscription->update_status( $status, __( 'Actualizado por webhook de Recurrente.', 'recurrente-for-woocommerce' ) );
+		} );
 	}
 
 	/**
