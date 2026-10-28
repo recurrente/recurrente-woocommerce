@@ -253,3 +253,35 @@ msgstr ""
 #: includes/class-recurrente-webhook-registrar.php:113
 msgid "producción"
 msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:28
+msgid "Consultar pago en Recurrente"
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:38
+msgid "Recurrente confirmó el pago y se concilió la orden."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:39
+msgid "Ya se consultó este pago hace menos de un minuto. Esperá antes de consultar otra vez."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:40
+msgid "La orden ya no está pendiente de conciliación con Recurrente."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:41
+msgid "Recurrente aún no confirma el pago. No se inició otro cobro."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:42
+msgid "El checkout no tiene un intent consultable. Revisá el webhook y el pago en Recurrente antes de modificar la orden."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:44
+msgid "No se pudo conciliar el pago. Revisá el ambiente, la referencia, el monto y la moneda en Recurrente; no inicies otro cobro."
+msgstr ""
+
+#: includes/class-recurrente-pending-payments.php:21
+msgid "Cada cinco minutos"
+msgstr ""

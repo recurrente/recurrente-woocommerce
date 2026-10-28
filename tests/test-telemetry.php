@@ -55,7 +55,8 @@ if ( ! function_exists( 'wp_generate_uuid4' ) ) {
 	}
 }
 if ( ! function_exists( 'wp_next_scheduled' ) ) {
-	function wp_next_scheduled( $hook ) {
+	function wp_next_scheduled( $hook, $args = array() ) {
+		if ( $args ) { return $GLOBALS['recurrente_recovery_cron'][ $hook . json_encode( $args ) ]['at'] ?? false; }
 		return isset( $GLOBALS['recurrente_cron'][ $hook ] ) ? $GLOBALS['recurrente_cron'][ $hook ] : false;
 	}
 }

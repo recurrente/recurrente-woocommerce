@@ -2,8 +2,8 @@
 /**
  * Receives Recurrente webhooks (delivered via Svix) and reconciles orders.
  *
- * Webhooks are the source of truth for fulfillment — the buyer's success_url
- * return is never trusted to mark an order paid. The endpoint is public and
+ * Signed webhooks and authenticated API lookups confirm fulfillment; the buyer's
+ * success_url return alone is never trusted to mark an order paid. The endpoint is public and
  * secured by the Svix signature; replays are de-duplicated by the svix-id,
  * and paid events additionally by the charge's intent id (see mark_paid and
  * Recurrente_Charge_Order_Link).
@@ -55,6 +55,24 @@ class Recurrente_Webhook_Handler {
 	public static function handle( WP_REST_Request $request ) {
 		$handler = new self();
 		return $handler->process( $request );
+	}
+
+	/** Only the server-side reconciliation worker supplies an authenticated GET /intents response. */
+	public static function reconcile_payment( $order_id, $mode, array $intent ) {
+		if ( ! in_array( $mode, array( 'live', 'test' ), true ) || 'succeeded' !== ( $intent['status'] ?? null )
+			|| 'succeeded' !== ( $intent['raw_status'] ?? null ) || ! is_string( $intent['legacy_id'] ?? null ) || '' === $intent['legacy_id']
+			|| ! in_array( $intent['type'] ?? null, array( 'payment', 'bank_transfer', 'crypto', 'balance', 'cash' ), true ) ) {
+			return false;
+		}
+		$handler = new self();
+		$handler->signing_modes = array( $mode );
+		$handler->charge_id = $intent['legacy_id'];
+		$intent['event_type'] = self::PAID_EVENT;
+		return Recurrente_Order_Lock::run( $order_id, function ( $order ) use ( $handler, $intent ) {
+			if ( ! Recurrente_Payment_Reconciliation::eligible( $order ) ) { return $order->is_paid(); }
+			$handler->apply_locked( self::PAID_EVENT, $order, $intent );
+			return $order->is_paid();
+		} );
 	}
 
 	/**
