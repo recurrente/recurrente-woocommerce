@@ -71,6 +71,12 @@ class Stub_Renewal_Order {
 
 if ( ! class_exists( 'Stub_Subscription' ) ) {
 class Stub_Subscription {
+	public function get_total() {
+		return '100.00';
+	}
+	public function get_currency() {
+		return 'GTQ';
+	}
 	public $id;
 	public function __construct( $id ) {
 		$this->id = $id;
@@ -87,10 +93,12 @@ class Stub_Wpdb {
 	public $held_elsewhere = array();
 	public $on_lock = null;
 	public $locks_taken = 0;
+	public $unavailable = false;
 	public function prepare( $sql, ...$args ) {
 		return vsprintf( str_replace( array( '%s', '%d' ), array( "'%s'", '%d' ), $sql ), $args );
 	}
 	public function get_var( $sql ) {
+		if ( $this->unavailable ) { return null; }
 		preg_match( "/GET_LOCK\('([^']+)'/", $sql, $m );
 		if ( in_array( $m[1], $this->held_elsewhere, true ) ) {
 			return '0';
