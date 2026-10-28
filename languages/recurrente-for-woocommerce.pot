@@ -253,3 +253,85 @@ msgstr ""
 #: includes/class-recurrente-webhook-registrar.php:113
 msgid "producción"
 msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:39
+msgid "No se pudo conservar la identidad del reembolso. Recargá la orden y consultá su estado antes de intentar otro."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:53
+msgid "No se pudo identificar esta solicitud de reembolso. Recargá la orden y consultá su estado antes de intentar otro."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:82
+msgid "Hay un reembolso de WooCommerce en curso. Volvé a consultar en unos segundos."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:115
+msgid "Consultar reembolso de Recurrente"
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:177
+msgid "No tenés permiso para reembolsar esta orden."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:188
+msgid "Ya existe una solicitud de reembolso. Usá la acción «Consultar reembolso de Recurrente» antes de solicitar otro."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:206
+msgid "Iniciá el reembolso desde el formulario de reembolsos de la orden."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:223
+msgid "No se pudo verificar el pago original y su ambiente. Reconciliá la orden con soporte antes de reembolsar."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:244
+msgid "El monto debe ser positivo y no superar el saldo reembolsable."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:262
+msgid "El monto del reembolso debe tener como máximo dos decimales."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:271
+msgid "Falta la llave del ambiente original de la orden."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:279
+msgid "Resultado desconocido fuera de la ventana segura. Soporte debe reconciliar la solicitud original; no generés otra."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:332
+msgid "El reembolso remoto no coincide con la solicitud original. Requiere reconciliación con soporte."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:433
+msgid "resultado desconocido; no solicités otro reembolso"
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:434
+msgid "pendiente; todavía no se registró como reembolsado en WooCommerce"
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:435
+msgid "confirmado en Recurrente"
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:436
+msgid "fallido; no se confirmó devolución de dinero"
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:437
+msgid "anulado"
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:438
+msgid "confirmado y registrado en WooCommerce; no se volvió a reembolsar"
+msgstr ""
+
+#. translators: 1: operation key, 2: remote id, 3: amount, 4: currency, 5: state
+#: includes/class-recurrente-refund-operations.php:441
+#, php-format
+msgid "Reembolso %1$s (%2$s), %3$s %4$s: %5$s. Consultá su estado con la acción «Consultar reembolso de Recurrente»."
+msgstr ""

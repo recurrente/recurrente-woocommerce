@@ -53,6 +53,8 @@ class Recurrente_Plugin {
 		add_action( 'woocommerce_blocks_loaded', array( $this, 'register_blocks_support' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( RECURRENTE_PLUGIN_FILE ), array( $this, 'settings_link' ) );
 		Recurrente_Subscriptions::register_hooks();
+		Recurrente_Refund_Operations::register_hooks();
+		Recurrente_Refund_Sync::register_hooks();
 		Recurrente_Telemetry::register_hooks();
 	}
 

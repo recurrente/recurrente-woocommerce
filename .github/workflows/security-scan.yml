@@ -48,3 +48,14 @@ jobs:
           printf '%s\0' "${php_files[@]}" | xargs -0 -n1 php -l
       - name: Run tests
         run: php tests/run.php
+
+  javascript:
+    name: Refund request identity tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Install test package
+        run: npm install --ignore-scripts
+      - name: Test native refund request identity
+        run: npm test

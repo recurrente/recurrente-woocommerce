@@ -131,7 +131,12 @@ Tests:
 
 ```shell
 php tests/run.php
+npm install --ignore-scripts
+npm test
 ```
+
+Contrato y pruebas de la iniciación de reembolsos desde la orden (implementación en Draft):
+[docs/refund-operations.md](docs/refund-operations.md).
 
 ## Licencia
 

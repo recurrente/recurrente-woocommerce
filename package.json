@@ -1,0 +1,7 @@
+{
+  "name": "recurrente-for-woocommerce-tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/admin-refunds.test.js"
+  }
+}

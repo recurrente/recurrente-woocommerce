@@ -37,6 +37,15 @@ class Recurrente_API_Client {
 		return $this->request( 'GET', '/checkouts/' . rawurlencode( $id ) );
 	}
 
+	/** The caller must persist the key and exact payload before sending money requests. */
+	public function create_refund( array $payload, $operation_key ) {
+		return $this->request( 'POST', '/refunds', $payload, array( 'Idempotency-Key' => $operation_key ) );
+	}
+
+	public function get_refund( $id ) {
+		return $this->request( 'GET', '/refunds/' . rawurlencode( $id ) );
+	}
+
 	/**
 	 * Find-or-create a customer so the hosted checkout prefills name/email/phone.
 	 * Recurrente keys customers by email, so repeat buyers reuse the same record.
@@ -69,10 +78,10 @@ class Recurrente_API_Client {
 		return $this->request( 'POST', $path, $payload );
 	}
 
-	private function request( $method, $path, ?array $payload = null ) {
+	private function request( $method, $path, ?array $payload = null, array $headers = array() ) {
 		$args = array(
 			'method'  => $method,
-			'headers' => $this->headers(),
+			'headers' => array_merge( $this->headers(), $headers ),
 			'timeout' => 30,
 		);
 		if ( null !== $payload ) {
@@ -105,7 +114,7 @@ class Recurrente_API_Client {
 			return is_array( $body ) ? $body : array();
 		}
 		Recurrente_Telemetry::note_error( $this->error_code( $status ) );
-		throw new Recurrente_API_Exception( esc_html( $this->error_message( $body ) ), (int) $status );
+		throw new Recurrente_API_Exception( esc_html( $this->error_message( $body ) ), (int) $status, is_array( $body ) ? $body : array() );
 	}
 
 	private function error_code( $status ) {
@@ -121,4 +130,16 @@ class Recurrente_API_Client {
 	}
 }
 
-class Recurrente_API_Exception extends Exception {}
+class Recurrente_API_Exception extends Exception {
+	private $response_data;
+
+	public function __construct( $message, $code = 0, array $response_data = array() ) {
+		parent::__construct( $message, $code );
+		$this->response_data = $response_data;
+	}
+
+	/** A 422 may identify an existing refund. Never infer completion from its message. */
+	public function response_data() {
+		return $this->response_data;
+	}
+}
