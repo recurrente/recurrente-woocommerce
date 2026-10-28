@@ -48,6 +48,10 @@ class Recurrente_Checkout_Builder {
 	 * is a one-time sale.
 	 */
 	public function items() {
+		$error = $this->validation_error();
+		if ( $error ) {
+			throw new InvalidArgumentException( $error );
+		}
 		$items = $this->contains_subscription() ? $this->subscription_items() : $this->one_time_items();
 		return array_map( array( $this, 'apply_options' ), $items );
 	}
@@ -76,18 +80,48 @@ class Recurrente_Checkout_Builder {
 		return function_exists( 'wcs_order_contains_subscription' ) && wcs_order_contains_subscription( $this->order );
 	}
 
-	/**
-	 * Recurring items, one per subscription, plus its one-time sign-up fee.
-	 * WC's billing periods (day/week/month/year) map 1:1 to Recurrente's.
-	 */
-	private function subscription_items() {
-		$subscriptions = wcs_get_subscriptions_for_order( $this->order, array( 'order_type' => 'parent' ) );
-		$items         = array();
-		foreach ( $subscriptions as $subscription ) {
-			$items[] = $this->recurring_item( $subscription );
-			$items   = array_merge( $items, $this->sign_up_fee_item( $subscription ) );
+	/** Reject carts the API cannot represent before creating any remote objects. */
+	public function validation_error() {
+		if ( ! $this->contains_subscription() ) {
+			return null;
 		}
-		return $items;
+		$subscriptions = $this->subscriptions();
+		if ( 1 !== count( $subscriptions ) ) {
+			return __( 'Recurrente solo permite una suscripción por pedido. Comprá cada suscripción por separado o elegí otro método de pago.', 'recurrente-for-woocommerce' );
+		}
+		$subscription = reset( $subscriptions );
+		if ( $this->product_quantities( $this->order ) !== $this->product_quantities( $subscription ) ) {
+			return __( 'Recurrente no permite combinar suscripciones y productos de pago único. Separá los productos en pedidos distintos o elegí otro método de pago.', 'recurrente-for-woocommerce' );
+		}
+		if ( 0 !== $this->to_cents( $subscription->get_sign_up_fee() ) ) {
+			return __( 'Recurrente no permite cuotas de inscripción junto con una suscripción. Elegí otro método de pago o consultá con la tienda.', 'recurrente-for-woocommerce' );
+		}
+		$initial_total = $this->free_trial( $subscription ) ? 0 : $this->to_cents( $subscription->get_total() );
+		if ( $this->currency() !== $subscription->get_currency() || $this->to_cents( $this->order->get_total() ) !== $initial_total ) {
+			return __( 'Recurrente no puede representar exactamente el total inicial de esta suscripción, incluidos impuestos, envío y cargos. Elegí otro método de pago o consultá con la tienda.', 'recurrente-for-woocommerce' );
+		}
+		return null;
+	}
+
+	private function subscriptions() {
+		return wcs_get_subscriptions_for_order( $this->order, array( 'order_type' => 'parent' ) );
+	}
+
+	/** WCS copies line items with new IDs; match products, variations and quantities. */
+	private function product_quantities( $order ) {
+		$quantities = array();
+		foreach ( $order->get_items() as $item ) {
+			$key = $item->get_product_id() . ':' . $item->get_variation_id();
+			$quantities[ $key ] = ( isset( $quantities[ $key ] ) ? $quantities[ $key ] : 0 ) + (int) $item->get_quantity();
+		}
+		ksort( $quantities );
+		return $quantities;
+	}
+
+	/** One recurring total already includes recurring shipping, fees and taxes. */
+	private function subscription_items() {
+		$subscriptions = $this->subscriptions();
+		return array( $this->recurring_item( reset( $subscriptions ) ) );
 	}
 
 	private function recurring_item( $subscription ) {
@@ -125,14 +159,6 @@ class Recurrente_Checkout_Builder {
 		$start = $subscription->get_time( 'date_created' );
 		$end   = $subscription->get_time( 'trial_end' );
 		return (int) ceil( ( $end - $start ) / DAY_IN_SECONDS );
-	}
-
-	private function sign_up_fee_item( $subscription ) {
-		$cents = $this->to_cents( $subscription->get_sign_up_fee() );
-		if ( $cents <= 0 ) {
-			return array();
-		}
-		return array( $this->inline_item( __( 'Cuota de inscripción', 'recurrente-for-woocommerce' ), $cents, 1 ) );
 	}
 
 	/**

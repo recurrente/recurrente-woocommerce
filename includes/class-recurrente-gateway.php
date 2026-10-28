@@ -62,7 +62,6 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 			'subscription_cancellation',
 			'subscription_suspension',
 			'subscription_reactivation',
-			'multiple_subscriptions',
 		) );
 	}
 
@@ -228,6 +227,10 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 	private function start_checkout( $order, $builder ) {
 		if ( ! $builder->supported_currency() ) {
 			return $this->fail( __( 'Recurrente solo acepta GTQ y USD.', 'recurrente-for-woocommerce' ) );
+		}
+		$error = $builder->validation_error();
+		if ( $error ) {
+			return $this->fail( $error );
 		}
 		try {
 			$items = $builder->items();
