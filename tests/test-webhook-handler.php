@@ -65,12 +65,22 @@ if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 	define( 'DAY_IN_SECONDS', 86400 );
 }
 
+if ( ! function_exists( 'wp_cache_delete' ) ) {
+	function wp_cache_delete( $id, $group ) { unset( $GLOBALS['recurrente_binding_cache'][ $group ][ $id ] ); return true; }
+}
+
 /** The checkout's own order: meta is only visible once saved, like the real store. */
+class Stub_Binding_Order_Data_Store {
+	public function get_current_class_name() { return get_class( $this ); }
+	public function read( $order ) {}
+}
+
 class Stub_Webhook_Order {
 	public $id;
 	public $key = 'wc_order_abc';
 	public $paid = false;
 	public $completions = array();
+	public $on_payment_complete = null;
 	public $subscriptions = array();
 	private $meta = array( '_recurrente_checkout_id' => 'ch_test' );
 	private $pending_meta = array();
@@ -83,10 +93,20 @@ class Stub_Webhook_Order {
 	public function get_order_key() {
 		return $this->key;
 	}
+	public function get_data_store() { return new Stub_Binding_Order_Data_Store(); }
+	public function read_meta_data( $force = false ) {}
+
+	public function get_total() {
+		return '100.00';
+	}
+	public function get_currency() {
+		return 'GTQ';
+	}
 	public function is_paid() {
 		return $this->paid;
 	}
 	public function payment_complete( $transaction_id ) {
+		if ( $this->on_payment_complete ) { call_user_func( $this->on_payment_complete ); }
 		$this->paid          = true;
 		$this->completions[] = $transaction_id;
 	}
@@ -124,8 +144,14 @@ function recurrente_test_event( $type, $order, $legacy_intent_id ) {
 	$event = array(
 		'event_type' => $type,
 		'id'         => 0 === strpos( $type, 'intent.' ) ? 'in_' . $legacy_intent_id : $legacy_intent_id,
-		'checkout'   => array( 'metadata' => array( 'wc_order_id' => $order->get_id(), 'wc_order_key' => $order->get_order_key() ) ),
+		'amount_in_cents' => 10000,
+		'currency' => 'GTQ',
+		'checkout'   => array( 'id' => 'ch_test', 'live_mode' => true, 'total_in_cents' => 10000, 'currency' => 'GTQ', 'metadata' => array( 'wc_order_id' => $order->get_id(), 'wc_order_key' => $order->get_order_key() ) ),
 	);
+	if ( $order->subscriptions ) {
+		$event['subscription'] = array( 'id' => 'su_original' );
+		$event['payment'] = array( 'paymentable' => array( 'type' => 'Subscription', 'id' => 'su_original', 'metadata' => $event['checkout']['metadata'] ) );
+	}
 	if ( 0 === strpos( $type, 'intent.' ) ) {
 		$event['legacy_id'] = $legacy_intent_id;
 	}
@@ -239,6 +265,8 @@ it( 'a delivery whose charge is locked by another delivery is answered 503 and l
 
 
 class Stub_Webhook_Refundable_Order extends Stub_Refundable_Order {
+	public function get_data_store() { return new Stub_Binding_Order_Data_Store(); }
+	public function read_meta_data( $force = false ) {}
 	public function get_order_key() {
 		return 'wc_order_refund';
 	}

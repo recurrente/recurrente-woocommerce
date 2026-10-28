@@ -9,6 +9,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-recurrente-order-lock.php';
+
 class Recurrente_Gateway extends WC_Payment_Gateway {
 
 	const ID = 'recurrente';
@@ -184,9 +186,18 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 	}
 
 	public function process_payment( $order_id ) {
-		$order   = wc_get_order( $order_id );
-		$builder = new Recurrente_Checkout_Builder( $order, $this->checkout_options() );
-		return $this->start_checkout( $order, $builder );
+		try {
+			return Recurrente_Order_Lock::run( $order_id, function ( $order ) {
+				if ( $order->is_paid() ) {
+					return array( 'result' => 'success', 'redirect' => $this->get_return_url( $order ) );
+				}
+				$builder = new Recurrente_Checkout_Builder( $order, $this->checkout_options() );
+				return $this->start_checkout( $order, $builder );
+			} );
+		} catch ( Recurrente_Order_Locked $e ) {
+			Recurrente_Logger::error( 'order locked by another request', array( 'order' => $order_id ) );
+			return $this->fail( __( 'Ya estamos procesando tu pago con Recurrente. Volvé a intentar en unos segundos.', 'recurrente-for-woocommerce' ) );
+		}
 	}
 
 	/**
@@ -238,16 +249,25 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 
 	private function create_and_redirect( $order, $items ) {
 		try {
-			$checkout = $this->client()->create_checkout( $this->checkout_payload( $order, $items ) );
-			return $this->redirect_to( $order, $checkout );
+			$payload  = $this->checkout_payload( $order, $items );
+			$checkout = $this->client()->create_checkout( $payload );
+			return $this->redirect_to( $order, $checkout, $payload['metadata'] );
 		} catch ( Recurrente_API_Exception $e ) {
 			Recurrente_Logger::error( 'create_checkout failed', array( 'order' => $order->get_id(), 'error' => $e->getMessage() ) );
 			return $this->fail( __( 'No pudimos iniciar el pago con Recurrente. Intentá de nuevo.', 'recurrente-for-woocommerce' ) );
 		}
 	}
 
-	private function redirect_to( $order, $checkout ) {
+	private function redirect_to( $order, $checkout, $metadata ) {
 		$order->update_meta_data( '_recurrente_checkout_id', $checkout['id'] );
+		$order->update_meta_data( '_recurrente_payment_binding', array(
+			'attempt'     => $metadata['wc_payment_attempt'],
+			'base_amount' => $checkout['total_in_cents'] ?? null,
+			'mode'        => 'yes' === $this->get_option( 'test_mode' ) ? 'test' : 'live',
+			'amount'      => (int) round( (float) $order->get_total() * 100 ),
+			'currency'    => $order->get_currency(),
+			'dynamic'     => 'yes' === $this->get_option( 'dynamic_pricing' ),
+		) );
 		$order->update_status( 'pending', __( 'Esperando pago en Recurrente.', 'recurrente-for-woocommerce' ) );
 		$order->save();
 		return array(
@@ -261,9 +281,10 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 			'items'       => $items,
 			'customer_id' => $this->customer_id_for( $order ),
 			'metadata'    => array(
-				'wc_order_id'  => (string) $order->get_id(),
-				'wc_order_key' => $order->get_order_key(),
-				'source'       => 'woocommerce',
+				'wc_payment_attempt' => wp_generate_uuid4(),
+				'wc_order_id'        => (string) $order->get_id(),
+				'wc_order_key'       => $order->get_order_key(),
+				'source'             => 'woocommerce',
 			),
 		) );
 	}
