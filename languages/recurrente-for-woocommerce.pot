@@ -254,32 +254,40 @@ msgstr ""
 msgid "producción"
 msgstr ""
 
-#: includes/class-recurrente-payment-recovery.php:28
+#: includes/class-recurrente-payment-recovery.php:34
 msgid "Consultar pago en Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-payment-recovery.php:38
-msgid "Recurrente confirmó el pago y se concilió la orden."
+#: includes/class-recurrente-payment-recovery.php:56
+msgid "Pago confirmado al consultar Recurrente."
 msgstr ""
 
-#: includes/class-recurrente-payment-recovery.php:39
-msgid "Ya se consultó este pago hace menos de un minuto. Esperá antes de consultar otra vez."
+#: includes/class-recurrente-payment-recovery.php:57
+msgid "Recurrente aún no confirma el pago."
 msgstr ""
 
-#: includes/class-recurrente-payment-recovery.php:40
-msgid "La orden ya no está pendiente de conciliación con Recurrente."
+#: includes/class-recurrente-payment-recovery.php:58
+msgid "Este pago se consultó hace menos de un minuto. Intentá de nuevo en un momento."
 msgstr ""
 
-#: includes/class-recurrente-payment-recovery.php:41
-msgid "Recurrente aún no confirma el pago. No se inició otro cobro."
+#: includes/class-recurrente-payment-recovery.php:59
+msgid "Esta orden ya no está pendiente de pago."
 msgstr ""
 
-#: includes/class-recurrente-payment-recovery.php:42
-msgid "El checkout no tiene un intent consultable. Revisá el webhook y el pago en Recurrente antes de modificar la orden."
+#: includes/class-recurrente-payment-recovery.php:60
+msgid "El pago en Recurrente no coincide con esta orden. Revisalo en Recurrente antes de cobrar otra vez."
 msgstr ""
 
-#: includes/class-recurrente-payment-recovery.php:44
-msgid "No se pudo conciliar el pago. Revisá el ambiente, la referencia, el monto y la moneda en Recurrente; no inicies otro cobro."
+#: includes/class-recurrente-payment-recovery.php:61
+msgid "Este pago no se puede verificar desde WooCommerce. Revisalo en Recurrente antes de cambiar el estado de la orden."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:62
+msgid "No se pudo consultar Recurrente. Intentá de nuevo en unos minutos."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:88
+msgid "Consultando a Recurrente…"
 msgstr ""
 
 #: includes/class-recurrente-pending-payments.php:21

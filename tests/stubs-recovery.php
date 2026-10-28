@@ -14,7 +14,8 @@ class Stub_Recovery_Order extends Stub_Webhook_Order {
 	public function get_customer_id() { return $this->customer; }
 	public function get_total() { return $this->amount; }
 	public function get_currency() { return $this->currency; }
-	public function add_order_note( $note ) { $this->notes[] = $note; }
+	public $note_args = array();
+	public function add_order_note( $note, $is_customer_note = 0, $added_by_user = false ) { $this->notes[] = $note; $this->note_args[] = array( $is_customer_note, $added_by_user ); }
 }
 
 function add_action( $hook, $callback, $priority = 10, $accepted_args = 1 ) { $GLOBALS['recurrente_recovery_hooks'][ $hook ][] = array( $callback, $priority, $accepted_args ); }
@@ -48,6 +49,29 @@ function as_unschedule_all_actions( $hook, $args, $group ) {
 	foreach ( $GLOBALS['recurrente_recovery_as'] as $key => $event ) { if ( $event['hook'] === $hook && $event['group'] === $group ) { unset( $GLOBALS['recurrente_recovery_as'][ $key ] ); } }
 }
 
+if ( ! defined( 'MINUTE_IN_SECONDS' ) ) { define( 'MINUTE_IN_SECONDS', 60 ); }
+if ( ! function_exists( 'delete_transient' ) ) {
+	function delete_transient( $key ) { unset( $GLOBALS['recurrente_test_transients'][ $key ] ); return true; }
+}
+if ( ! function_exists( 'esc_attr' ) ) { function esc_attr( $text ) { return $text; } }
+if ( ! function_exists( 'esc_html__' ) ) { function esc_html__( $text, $domain = null ) { return $text; } }
+function get_current_screen() { return $GLOBALS['recurrente_screen']; }
+function wc_get_page_screen_id( $page ) { return $GLOBALS['recurrente_order_screen']; }
+
+/** Woo's order edit screen as the browser requests it: HPOS by default, CPT with $storage = 'cpt'. */
+function recurrente_admin_screen( $order_id, $storage = 'hpos', $action = 'edit' ) {
+	$GLOBALS['recurrente_order_screen'] = 'cpt' === $storage ? 'shop_order' : 'woocommerce_page_wc-orders';
+	$GLOBALS['recurrente_screen'] = (object) array( 'id' => $GLOBALS['recurrente_order_screen'] );
+	$_GET = 'cpt' === $storage ? array( 'post' => (string) $order_id ) : array( 'page' => 'wc-orders', 'id' => (string) $order_id );
+	if ( null !== $action ) { $_GET['action'] = $action; }
+}
+
+function recurrente_admin_notice_html() {
+	ob_start();
+	Recurrente_Payment_Recovery::result_notice();
+	return ob_get_clean();
+}
+
 function recurrente_recovery_order( $id = 700 ) {
 	recurrente_reset_renewal_world();
 	$order = new Stub_Recovery_Order( $id );
@@ -65,6 +89,9 @@ function recurrente_recovery_order( $id = 700 ) {
 	$GLOBALS['recurrente_current_user'] = 0;
 	$GLOBALS['recurrente_can_edit'] = false;
 	$GLOBALS['recurrente_binding_cache'] = array();
+	$GLOBALS['recurrente_test_transients'] = array();
+	$GLOBALS['recurrente_screen'] = null;
+	$GLOBALS['recurrente_order_screen'] = 'woocommerce_page_wc-orders';
 	$_GET = array( 'key' => $order->get_order_key() );
 	$_POST = array();
 	update_option( Recurrente_Pending_Payments::PAGE_OPTION, 1 );

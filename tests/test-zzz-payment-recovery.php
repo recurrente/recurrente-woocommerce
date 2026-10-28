@@ -375,3 +375,85 @@ it( 'a new checkout attempt clears the previous recovery cooldown', function () 
 } );
 
 unset( $GLOBALS['recurrente_binding_response_for_request'] );
+
+/** Run the admin action as Woo dispatches it: authorized merchant, valid HPOS save nonce. */
+function recurrente_run_admin_action( $order, $user = 5 ) {
+	$GLOBALS['recurrente_can_edit'] = true;
+	$GLOBALS['recurrente_current_user'] = $user;
+	$_POST['_wpnonce'] = 'valid-update-order_' . $order->get_id();
+	Recurrente_Payment_Recovery::admin_recover( $order );
+}
+
+$recurrente_admin_outcomes = array(
+	'paid'        => array( 'success', 'Pago confirmado al consultar Recurrente.', null ),
+	'pending'     => array( 'warning', 'Recurrente aún no confirma el pago.', function () { $GLOBALS['recurrente_recovery_intent']['checkout']['status'] = 'unpaid'; } ),
+	'mismatch'    => array( 'error', 'El pago en Recurrente no coincide con esta orden. Revisalo en Recurrente antes de cobrar otra vez.', function () { $GLOBALS['recurrente_recovery_intent']['checkout']['total_in_cents'] += 1000; } ),
+	'unsupported' => array( 'error', 'Este pago no se puede verificar desde WooCommerce. Revisalo en Recurrente antes de cambiar el estado de la orden.', function () { $GLOBALS['recurrente_recovery_intent']['checkout']['latest_intent'] = null; } ),
+	'unavailable' => array( 'error', 'No se pudo consultar Recurrente. Intentá de nuevo en unos minutos.', function () {
+		$GLOBALS['recurrente_binding_response_for_request'] = function ( $url, $args ) {
+			$GLOBALS['recurrente_recovery_http'][] = array( $url, $args );
+			return array( 'response' => array( 'code' => 503 ), 'body' => '{}' );
+		};
+	} ),
+);
+foreach ( $recurrente_admin_outcomes as $result => list( $type, $message, $arrange ) ) {
+	it( "admin: $result writes one attributed note and a $type notice for that order", function () use ( $type, $message, $arrange ) {
+		$order = recurrente_recovery_order();
+		if ( $arrange ) { $arrange(); }
+		recurrente_run_admin_action( $order );
+		recurrente_admin_screen( 700 );
+		$html = recurrente_admin_notice_html();
+		return array( $message ) === $order->notes && array( array( 0, true ) ) === $order->note_args
+			&& "<div class=\"notice notice-$type is-dismissible\"><p>$message</p></div>" === $html
+			&& '' === recurrente_admin_notice_html();
+	} );
+}
+
+
+it( 'admin: a repeat within the cooldown makes no lookup and leaves no note, only a warning notice', function () {
+	$order = recurrente_recovery_order();
+	$GLOBALS['recurrente_recovery_intent']['checkout']['status'] = 'unpaid';
+	recurrente_run_admin_action( $order );
+	recurrente_admin_screen( 700 );
+	recurrente_admin_notice_html();
+	$lookups = count( $GLOBALS['recurrente_recovery_http'] );
+	recurrente_run_admin_action( $order );
+	return 1 === count( $order->notes ) && $lookups === count( $GLOBALS['recurrente_recovery_http'] )
+		&& false !== strpos( recurrente_admin_notice_html(), 'notice-warning is-dismissible"><p>Este pago se consultó hace menos de un minuto.' );
+} );
+
+it( 'admin: an order that is no longer pending gets an info notice and no note', function () {
+	$order = recurrente_recovery_order();
+	$order->status = 'processing';
+	recurrente_run_admin_action( $order );
+	recurrente_admin_screen( 700 );
+	return array() === $order->notes && array() === $GLOBALS['recurrente_recovery_http']
+		&& false !== strpos( recurrente_admin_notice_html(), 'notice-info is-dismissible"><p>Esta orden ya no está pendiente de pago.' );
+} );
+
+foreach ( array(
+	'another order'  => function () { recurrente_admin_screen( 701 ); },
+	'another user'   => function () { recurrente_admin_screen( 700 ); $GLOBALS['recurrente_current_user'] = 6; },
+	'the HPOS list'  => function () { recurrente_admin_screen( 700, 'hpos', null ); },
+	'a CPT non-edit' => function () { recurrente_admin_screen( 700, 'cpt', 'trash' ); },
+	'no permission'  => function () { recurrente_admin_screen( 700 ); $GLOBALS['recurrente_can_edit'] = false; },
+	'another screen' => function () { recurrente_admin_screen( 700 ); $GLOBALS['recurrente_screen'] = (object) array( 'id' => 'dashboard' ); },
+) as $where => $arrange ) {
+	it( "admin: the result notice is not shown or consumed on $where", function () use ( $arrange ) {
+		$order = recurrente_recovery_order();
+		recurrente_run_admin_action( $order );
+		$arrange();
+		$elsewhere = recurrente_admin_notice_html();
+		$GLOBALS['recurrente_current_user'] = 5;
+		$GLOBALS['recurrente_can_edit'] = true;
+		recurrente_admin_screen( 700 );
+		return '' === $elsewhere && false !== strpos( recurrente_admin_notice_html(), 'Pago confirmado al consultar Recurrente.' );
+	} );
+}
+
+it( 'admin: the CPT edit screen of the same order shows its notice', function () {
+	$order = recurrente_recovery_order();
+	recurrente_run_admin_action( $order );
+	recurrente_admin_screen( 700, 'cpt' );
+	return false !== strpos( recurrente_admin_notice_html(), 'notice-success' );
+} );
