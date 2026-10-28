@@ -21,11 +21,13 @@ a hypothetical persisted TEST intent, not refund support for simulated hosted ch
 An operation UUID survives response loss in the browser's session storage. Before HTTP,
 the order journal stores `woo_refund_<UUID>`, immutable request JSON, original intent,
 mode, currency, amount, provisional Woo refund ID and selected accounting lines. It
-contains no API credentials. Reusing a UUID, including after completion or with changed
-parameters, makes no additional money request. A newly acknowledged form submission can
+contains no API credentials. Once journaled, reusing a UUID, including after completion
+or with changed parameters, makes no additional money request. A newly acknowledged form submission can
 create a separate equal partial refund. After an unresolved result, consult the existing
 operation before requesting another. The script stops submission if it cannot retain
-identity; it also stops a changed amount/line selection on an unresolved browser request.
+identity. A form rejected before journaling can be corrected while retaining its UUID.
+The server rejects changes or repeats of an already journaled operation, including when
+the browser lost its response; browser validation never decides whether money was sent.
 
 Woo REST/programmatic callers must send `X-Recurrente-Refund-Operation: <UUID v4>` and
 keep that UUID across retries. A direct `process_refund` call without the native

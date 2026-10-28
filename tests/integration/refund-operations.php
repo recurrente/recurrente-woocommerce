@@ -92,6 +92,31 @@ function woo13_native( $order, $amount = 25, $extra = array(), $token = null ) {
 	return wc_create_refund( array_merge( array( 'order_id' => $order->get_id(), 'amount' => $amount,
 		'reason' => 'Solicitud de prueba', 'refund_payment' => true, 'restock_items' => false ), $extra ) );
 }
+class Woo13_Ajax_Done extends RuntimeException {}
+function woo13_ajax( $order, $amount, $token ) {
+	$before_post = $_POST;
+	$before_request = $_REQUEST;
+	$level = ob_get_level();
+	$die = function () { return function () { throw new Woo13_Ajax_Done(); }; };
+	add_filter( 'wp_doing_ajax', '__return_true' );
+	add_filter( 'wp_die_ajax_handler', $die );
+	$_POST = array( 'order_id' => $order->get_id(), 'refund_amount' => (string) $amount,
+		'refunded_amount' => '0', 'refund_reason' => 'Solicitud de prueba', 'api_refund' => 'true' );
+	$_REQUEST['security'] = wp_create_nonce( 'order-item' );
+	$_SERVER['HTTP_X_RECURRENTE_REFUND_OPERATION'] = $token;
+	ob_start();
+	try { WC_AJAX::refund_line_items(); }
+	catch ( Woo13_Ajax_Done $e ) { /* Capture the real AJAX JSON without terminating the test process. */ }
+	finally {
+		$output = '';
+		while ( ob_get_level() > $level ) { $output = ob_get_clean() . $output; }
+		$_POST = $before_post;
+		$_REQUEST = $before_request;
+		remove_filter( 'wp_doing_ajax', '__return_true' );
+		remove_filter( 'wp_die_ajax_handler', $die );
+	}
+	return json_decode( $output, true );
+}
 function woo13_operations( $order ) {
 	$fresh = wc_get_order( $order->get_id() );
 	$fresh->read_meta_data( true );
@@ -104,6 +129,30 @@ function woo13_accounted( $order, $amount, $count ) {
 }
 
 try {
+	woo13_case( 'AJAX validation failure permits a corrected amount with the same browser UUID', function () use ( &$remote, &$calls ) {
+		$order = woo13_order();
+		$token = wp_generate_uuid4();
+		$invalid = woo13_ajax( $order, 150, $token );
+		woo13_assert( false === $invalid['success'] && 0 === count( $calls ) && empty( woo13_operations( $order ) ), 'Invalid amount reached the journal or API' );
+		$remote = function () { return woo13_response( woo13_resource( 'Corrected' ) ); };
+		$corrected = woo13_ajax( $order, 25, $token );
+		woo13_assert( true === $corrected['success'] && 1 === count( $calls ), 'Corrected form stayed blocked or sent twice' );
+		woo13_assert( 'woo_refund_' . $token === $calls[0]['args']['headers']['Idempotency-Key'], 'Correction rotated the browser identity' );
+		woo13_accounted( $order, 25, 1 );
+	} );
+
+	woo13_case( 'AJAX correction after a pending operation cannot replace its persisted parameters', function () use ( &$remote, &$calls ) {
+		$order = woo13_order();
+		$token = wp_generate_uuid4();
+		$remote = function () { return woo13_response( woo13_resource( 'Frozen', 'pending' ), 202 ); };
+		woo13_assert( false === woo13_ajax( $order, 25, $token )['success'], 'Pending form falsely succeeded' );
+		Recurrente_Refund_Operations::release_native();
+		woo13_assert( false === woo13_ajax( $order, 30, $token )['success'], 'Changed amount replaced a pending refund' );
+		$operations = woo13_operations( $order );
+		woo13_assert( 1 === count( $calls ) && 1 === count( $operations ) && 2500 === current( $operations )['payload']['amount_in_cents'], 'Changed form mutated or resent the refund' );
+		woo13_accounted( $order, 0, 0 );
+	} );
+
 	woo13_case( 'native partial uses confirmed original pa_ intent and LIVE key despite TEST toggle; echoes never double account', function () use ( &$remote, &$calls ) {
 		$order = woo13_order();
 		$resource = woo13_resource();

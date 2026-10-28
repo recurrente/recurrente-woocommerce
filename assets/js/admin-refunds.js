@@ -3,7 +3,6 @@
 	'use strict';
 	const config = recurrenteRefunds;
 	const storageKey = 'recurrente-refund-' + config.orderId;
-	const fields = ['refund_amount', 'refund_reason', 'line_item_qtys', 'line_item_totals', 'line_item_tax_totals', 'restock_refunded_items'];
 	function uuid() {
 		if (window.crypto.randomUUID) { return window.crypto.randomUUID(); }
 		const bytes = window.crypto.getRandomValues(new Uint8Array(16));
@@ -19,16 +18,12 @@
 			return;
 		}
 		try {
-			const signature = JSON.stringify(fields.map(function (field) { return data.get(field); }));
 			let operation = JSON.parse(window.sessionStorage.getItem(storageKey));
 			if (operation && config.terminalKeys.indexOf('woo_refund_' + operation.id) !== -1) {
 				operation = null;
 			}
-			if (operation && operation.signature !== signature) {
-				throw new Error('Unresolved refund parameters changed');
-			}
 			if (!operation) {
-				operation = { id: uuid(), signature: signature };
+				operation = { id: uuid() };
 			}
 			window.sessionStorage.setItem(storageKey, JSON.stringify(operation));
 			xhr.setRequestHeader('X-Recurrente-Refund-Operation', operation.id);

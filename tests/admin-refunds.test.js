@@ -50,13 +50,14 @@ test('pending/error responses keep the identity; a confirmed response permits a 
   first.callback({ success: true });
   assert.notEqual(page.submit().headers['X-Recurrente-Refund-Operation'], first.headers['X-Recurrente-Refund-Operation']);
 });
-test('an unresolved operation cannot silently change its amount or selected line items', () => {
+test('a rejected form can be corrected using the same identity; the server journal owns immutable parameters', () => {
   const page = browser();
-  page.submit();
-  const changed = page.submit({ refund_amount: '30.00' });
-  assert.equal(changed.aborted, true);
-  assert.deepEqual(changed.headers, {});
-  assert.deepEqual(page.alerts, ['Blocked safely']);
+  const invalid = page.submit({ refund_amount: '150.00' });
+  invalid.callback({ success: false, data: { error: 'Invalid refund amount' } });
+  const changed = page.submit({ refund_amount: '25.00', line_item_totals: '{"1":"25.00"}' });
+  assert.equal(changed.aborted, false);
+  assert.equal(changed.headers['X-Recurrente-Refund-Operation'], invalid.headers['X-Recurrente-Refund-Operation']);
+  assert.deepEqual(page.alerts, []);
 });
 test('a fresh order page can start another operation after a persisted terminal result', () => {
   const page = browser();
