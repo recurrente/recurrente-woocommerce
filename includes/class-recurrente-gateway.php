@@ -229,12 +229,27 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 		if ( ! $builder->supported_currency() ) {
 			return $this->fail( __( 'Recurrente solo acepta GTQ y USD.', 'recurrente-for-woocommerce' ) );
 		}
-		return $this->create_and_redirect( $order, $builder );
+		try {
+			$items = $builder->items();
+		} catch ( UnexpectedValueException $e ) {
+			return $this->reject_unreconciled( $order );
+		}
+		return $this->create_and_redirect( $order, $items );
 	}
 
-	private function create_and_redirect( $order, $builder ) {
+	/**
+	 * The payer can't fix a total another plugin changed, so they get a way out
+	 * and the merchant gets the explanation on the order.
+	 */
+	private function reject_unreconciled( $order ) {
+		Recurrente_Logger::error( 'order total does not reconcile', array( 'order' => $order->get_id() ) );
+		$order->add_order_note( __( 'Recurrente no inició el cobro: el total de la orden no coincide con la suma de sus productos, envío y cargos. Revisá los plugins que modifican el total.', 'recurrente-for-woocommerce' ) );
+		return $this->fail( __( 'No pudimos iniciar el pago con Recurrente. Elegí otro método de pago o contactá a la tienda.', 'recurrente-for-woocommerce' ) );
+	}
+
+	private function create_and_redirect( $order, $items ) {
 		try {
-			$payload  = $this->checkout_payload( $order, $builder );
+			$payload  = $this->checkout_payload( $order, $items );
 			$checkout = $this->client()->create_checkout( $payload );
 			return $this->redirect_to( $order, $checkout, $payload['metadata'] );
 		} catch ( Recurrente_API_Exception $e ) {
@@ -261,9 +276,9 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 		);
 	}
 
-	private function checkout_payload( $order, $builder ) {
+	private function checkout_payload( $order, $items ) {
 		return array_merge( $this->buyer_urls( $order ), array(
-			'items'       => $builder->items(),
+			'items'       => $items,
 			'customer_id' => $this->customer_id_for( $order ),
 			'metadata'    => array(
 				'wc_payment_attempt' => wp_generate_uuid4(),

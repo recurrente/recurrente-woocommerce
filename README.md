@@ -13,9 +13,20 @@ automáticamente en WooCommerce por webhook. Para comercios en Guatemala — mon
 ## Cómo funciona
 
 WooCommerce es dueño de la orden de punta a punta; el plugin solo aporta la pasarela. Al **"Realizar
-pedido"**, arma un checkout de Recurrente **itemizado** a partir de los **totales reales de la orden**
-(nunca de precios del navegador, así que el total no se puede manipular) y redirige al comprador. El
-pago se marca **únicamente por webhook**, con la firma Svix verificada; el regreso del comprador por
+pedido"**, arma un checkout de Recurrente a partir de los **totales reales de la orden**
+(nunca de precios del navegador, así que el total no se puede manipular) y redirige al comprador.
+
+Normalmente conserva el detalle de productos, impuestos, envío y cargos.
+Cuando una orden de pago único incluye un cargo negativo, se envía una sola línea
+con el importe neto de WooCommerce: por ejemplo, Q100 de producto menos Q10 de ajuste cobra
+Q90. Se usa la misma representación si el redondeo de líneas difiere del total por centavos dentro
+del margen de redondeo (medio centavo por línea más medio centavo por el total). El detalle original
+se conserva en WooCommerce. Los cupones ya están incluidos en los totales de los productos y no se
+restan otra vez. Las órdenes de total cero o negativo y las diferencias que exceden ese margen se
+rechazan antes de crear un cliente o un checkout en Recurrente; una orden gratuita debe seguir el
+flujo sin pago de WooCommerce. Esta conciliación no modifica las suscripciones.
+
+El pago se marca **únicamente por webhook**, con la firma Svix verificada; el regreso del comprador por
 `success_url` nunca marca una orden como pagada. Un reembolso en Recurrente (total o parcial) reembolsa
 y reabastece la orden por el monto exacto; cada reembolso se aplica una sola vez.
 
