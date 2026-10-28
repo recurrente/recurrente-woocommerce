@@ -248,7 +248,8 @@ class Recurrente_Refund_Operations {
 		$this->operations[ $key ] = array_merge( $identity, array(
 			'amount' => $amount, 'started_at' => time(), 'state' => 'unknown', 'refund_id' => '', 'native_accepted' => false,
 			'wc_refund_id' => $context['refund']->get_id(),
-			'payload' => array( 'payment_intent_id' => $identity['intent'], 'amount_in_cents' => $amount, 'refund_application_fee' => false ),
+			'payload' => array( 'payment_intent_id' => $identity['intent'], 'amount_in_cents' => $amount,
+				'refund_application_fee' => false, 'require_new_refund' => true ),
 			'accounting' => array( 'reason' => $context['refund']->get_reason(), 'line_items' => $context['args']['line_items'] ?? array(),
 				'restock_items' => ! empty( $context['args']['restock_items'] ) ),
 		) );

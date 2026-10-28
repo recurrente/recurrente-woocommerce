@@ -137,6 +137,8 @@ npm test
 
 Contrato y pruebas de la iniciación de reembolsos desde la orden (implementación en Draft):
 [docs/refund-operations.md](docs/refund-operations.md).
+Su publicación requiere desplegar y verificar primero el contrato Rails `require_new_refund`
+de [#7311](https://github.com/recurrente/recurrente-app/pull/7311); no publicar este cambio de forma independiente.
 
 ## Licencia
 

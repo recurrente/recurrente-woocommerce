@@ -93,8 +93,10 @@ Verified against `recurrente-app`'s public API specification and implementation:
   [`IdempotencyKey`](https://github.com/recurrente/recurrente-app/blob/master/app/models/idempotency_key.rb)
   expires at 24h. A stable key alone is insufficient after that boundary.
 - [`Intent#resolve_pending_refund`](https://github.com/recurrente/recurrente-app/blob/master/app/models/intent.rb)
-  may reuse an equal pending refund across different keys. Per-payment exclusion and remote-ID
-  deduplication are necessary; two operations must never consume the same remote identity.
+  may reuse an equal pending refund across different keys. New operations persist
+  `require_new_refund: true` so a server implementing that contract rejects an unrelated
+  pending refund instead of assigning it to WooCommerce. Per-payment exclusion and remote-ID
+  deduplication alone cannot distinguish an independent pending operation.
 - Unlike [Stripe's partial refunds](https://docs.stripe.com/api/refunds/create), Recurrente
   restricts partial support to documented providers (CyberSource / Visa CyberSource / cash).
   This gateway uses the original card PaymentIntent alias, explicit `amount_in_cents`,
@@ -103,9 +105,16 @@ Verified against `recurrente-app`'s public API specification and implementation:
   responses including errors. That behavior is not assumed here. Both APIs have non-final
   [refund states](https://docs.stripe.com/refunds); accepted/pending never means local success.
 
-No provider contact, live refund or backend API change is required or performed by this PR.
+**Release blocker:** Rails support for `require_new_refund` from
+[#7311](https://github.com/recurrente/recurrente-app/pull/7311) must be deployed and verified
+before this plugin change is released. Current legacy servers silently ignore the new field;
+sending it is not capability negotiation. A distinct idempotency key does not prevent legacy
+pending-refund reuse. Keep this PR Draft and do not release it independently. Verify rejection
+of an independently created pending partial and same-key replay in an authorized test environment.
+
+No provider contact, live refund or backend deployment was performed by this PR.
 Actual provider support, credentials and an accessible signed webhook endpoint remain runtime
-requirements. Visual review of the native admin flow is **pending**; keep the PR Draft.
+requirements. Visual review of the native admin flow is **pending**.
 
 ## Integration with task 7
 

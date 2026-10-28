@@ -124,6 +124,26 @@ try {
 		woo13_assert( 1 === count( $calls ) && 'completed' === current( woo13_operations( $order ) )['state'], 'Echo made HTTP or did not finish' );
 	} );
 
+	woo13_case( 'an independent pending partial cannot be adopted by a new native operation', function () use ( &$remote, &$calls ) {
+		$order = woo13_order();
+		$external = woo13_resource( 'IndependentPending', 'pending' );
+		$remote = function ( $url, $args ) use ( $external ) {
+			$payload = json_decode( $args['body'], true );
+			return ! empty( $payload['require_new_refund'] )
+				? woo13_response( array( 'message' => 'An independent refund is pending.' ), 422 )
+				: woo13_response( $external, 202 );
+		};
+		woo13_assert( is_wp_error( woo13_native( $order ) ), 'An independent pending refund became native success' );
+		Recurrente_Refund_Operations::release_native();
+		$operation = current( woo13_operations( $order ) );
+		woo13_assert( '' === $operation['refund_id'] && 'unknown' === $operation['state'], 'An independent refund identity was adopted' );
+		woo13_assert( 1 === count( $calls ), 'Conflict caused another monetary request' );
+		woo13_accounted( $order, 0, 0 );
+		$external['status'] = 'succeeded';
+		woo13_assert( 503 === woo13_deliver( woo13_event( $order, $external ) )->get_status(), 'Ambiguous external completion was acknowledged' );
+		woo13_accounted( $order, 0, 0 );
+	} );
+
 	woo13_case( 'equal partials receive distinct durable operation identities', function () use ( &$remote, &$calls ) {
 		$order = woo13_order();
 		$sequence = 0;
