@@ -166,7 +166,38 @@ class Recurrente_Checkout_Builder {
 	 */
 	public function one_time_items() {
 		$items = array_map( array( $this, 'product_item' ), $this->order->get_items() );
-		return array_merge( array_values( $items ), $this->shipping_items(), $this->fee_items() );
+		$items = array_merge( array_values( $items ), $this->shipping_items(), $this->fee_items() );
+		return $this->reconcile_items( $items );
+	}
+
+	/**
+	 * Keep signed adjustments until reconciliation. Recurrente cannot represent
+	 * a negative price, so use one net-total item when itemization is unsafe.
+	 * Independently rounded lines may differ from the rounded grand total by
+	 * at most half a cent per line plus half a cent for the grand total.
+	 */
+	private function reconcile_items( $items ) {
+		$total        = $this->to_cents( $this->order->get_total() );
+		$sum          = 0;
+		$has_negative = false;
+		foreach ( $items as $item ) {
+			$sum += $item['amount_in_cents'] * $item['quantity'];
+			$has_negative = $has_negative || $item['amount_in_cents'] < 0;
+		}
+		$tolerance = (int) floor( ( count( $items ) + 1 ) / 2 );
+		if ( $total <= 0 || ! $items || abs( $sum - $total ) > $tolerance ) {
+			throw new UnexpectedValueException( 'Order total does not reconcile with checkout items.' );
+		}
+		if ( $has_negative || $sum !== $total ) {
+			return array( $this->inline_item( $this->order_label(), $total, 1 ) );
+		}
+		return $this->reject_zero( $items );
+	}
+
+	/** The order number the payer saw in the store, so both payer and merchant recognize the line. */
+	private function order_label() {
+		/* translators: %s: número de pedido de WooCommerce */
+		return sprintf( __( 'Pedido #%s', 'recurrente-for-woocommerce' ), $this->order->get_order_number() );
 	}
 
 	private function product_item( $item ) {
@@ -195,7 +226,7 @@ class Recurrente_Checkout_Builder {
 			$name  = sprintf( __( 'Envío: %s', 'recurrente-for-woocommerce' ), $shipping->get_name() );
 			$items[] = $this->inline_item( $name, $cents, 1 );
 		}
-		return $this->reject_zero( $items );
+		return $items;
 	}
 
 	private function fee_items() {
@@ -204,7 +235,7 @@ class Recurrente_Checkout_Builder {
 			$cents   = $this->to_cents( $fee->get_total() + $fee->get_total_tax() );
 			$items[] = $this->inline_item( $fee->get_name(), $cents, 1 );
 		}
-		return $this->reject_zero( $items );
+		return $items;
 	}
 
 	private function inline_item( $name, $amount_in_cents, $quantity ) {

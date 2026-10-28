@@ -32,6 +32,11 @@ class Recurrente_API_Client {
 		return $this->post( '/checkouts', $payload );
 	}
 
+	/** Resolve the original checkout's environment when upgrading an already-paid legacy order. */
+	public function get_checkout( $id ) {
+		return $this->request( 'GET', '/checkouts/' . rawurlencode( $id ) );
+	}
+
 	/**
 	 * Find-or-create a customer so the hosted checkout prefills name/email/phone.
 	 * Recurrente keys customers by email, so repeat buyers reuse the same record.

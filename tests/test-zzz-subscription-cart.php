@@ -6,15 +6,6 @@ function wcs_order_contains_subscription( $order ) {
 	return $order instanceof Stub_Subscription_Cart_Order;
 }
 
-function wc_add_notice( $message, $type ) {
-	$GLOBALS['recurrente_cart_notices'][] = array( $message, $type );
-}
-
-function wp_remote_request( $url, $args ) {
-	$GLOBALS['recurrente_cart_requests'][] = $url;
-	throw new RuntimeException( 'Unexpected HTTP request during cart preflight' );
-}
-
 class Stub_Subscription_Cart_Line extends Stub_Line_Item {
 	public $product_id = 10;
 	public $variation_id = 0;
@@ -26,12 +17,15 @@ class Stub_Subscription_Cart_Line extends Stub_Line_Item {
 	}
 }
 
-class Stub_Subscription_Cart_Order extends WC_Order {
+class Stub_Subscription_Cart_Order extends Stub_Checkout_Order {
 	public $subscriptions = array();
 	public $total = 112.0;
 	public function get_id() {
 		return 1011;
 	}
+	public function get_data_store() { return new Stub_Binding_Order_Data_Store(); }
+	public function read_meta_data( $force = false ) {}
+	public function is_paid() { return false; }
 	public function get_total() {
 		return $this->total;
 	}
@@ -86,14 +80,23 @@ function recurrente_cart_is_rejected( $order, $explanation ) {
 			return false;
 		}
 	}
+	recurrente_reset_renewal_world();
 	$GLOBALS['recurrente_test_orders'] = array( $order );
-	$GLOBALS['recurrente_cart_notices'] = array();
+	$GLOBALS['recurrente_binding_notices'] = array();
+	$GLOBALS['recurrente_binding_response_for_request'] = function ( $url, $args ) {
+		$GLOBALS['recurrente_cart_requests'][] = $url;
+		throw new RuntimeException( 'Unexpected HTTP request during cart preflight' );
+	};
 	$GLOBALS['recurrente_cart_requests'] = array();
 	$gateway = ( new ReflectionClass( 'Stub_Subscription_Cart_Gateway' ) )->newInstanceWithoutConstructor();
-	$result = $gateway->process_payment( $order->get_id() );
+	try {
+		$result = $gateway->process_payment( $order->get_id() );
+	} finally {
+		unset( $GLOBALS['recurrente_binding_response_for_request'] );
+	}
 	return array( 'result' => 'failure' ) === $result
 		&& array() === $GLOBALS['recurrente_cart_requests']
-		&& array( array( $builder->validation_error(), 'error' ) ) === $GLOBALS['recurrente_cart_notices'];
+		&& array( $builder->validation_error() ) === $GLOBALS['recurrente_binding_notices'];
 }
 
 it( 'subscription: recurring total includes shipping and tax exactly once, despite different WC item IDs', function () {
@@ -193,4 +196,32 @@ it( 'subscription: gateway does not advertise multiple subscriptions', function 
 	}
 	$supports = $method->invoke( $gateway );
 	return in_array( 'subscriptions', $supports, true ) && ! in_array( 'multiple_subscriptions', $supports, true );
+} );
+
+
+it( 'subscription: supported cart reaches checkout and persists the submitted attempt binding', function () {
+	recurrente_reset_renewal_world();
+	$order = recurrente_subscription_cart();
+	$GLOBALS['recurrente_test_orders'] = array( $order );
+	$requests = array();
+	$GLOBALS['recurrente_binding_response_for_request'] = function ( $url, $args ) use ( &$requests ) {
+		$requests[] = array( $url, $args );
+		$body = substr( $url, -10 ) === '/customers'
+			? array( 'id' => 'cus_recurring' )
+			: array( 'id' => 'ch_recurring', 'checkout_url' => 'https://pay.test/ch_recurring', 'total_in_cents' => 11200 );
+		return array( 'response' => array( 'code' => 201 ), 'body' => json_encode( $body ) );
+	};
+	try {
+		$gateway = ( new ReflectionClass( 'Stub_Checkout_Gateway' ) )->newInstanceWithoutConstructor();
+		$result = $gateway->process_payment( $order->get_id() );
+	} finally {
+		unset( $GLOBALS['recurrente_binding_response_for_request'] );
+	}
+	$payload = json_decode( $requests[1][1]['body'], true );
+	$binding = $order->meta['_recurrente_payment_binding'];
+	return 'success' === $result['result'] && 'https://pay.test/ch_recurring' === $result['redirect']
+		&& 2 === count( $requests ) && 11200 === $payload['items'][0]['amount_in_cents']
+		&& 'recurring' === $payload['items'][0]['charge_type'] && 'ch_recurring' === $order->meta['_recurrente_checkout_id']
+		&& 11200 === $binding['amount'] && 11200 === $binding['base_amount']
+		&& 'test' === $binding['mode'] && $payload['metadata']['wc_payment_attempt'] === $binding['attempt'];
 } );
