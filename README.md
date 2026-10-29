@@ -104,6 +104,10 @@ No abras otro cobro solo porque el webhook no actualizó la orden.
 
 ## Recuperar un pago sin webhook aplicado
 
+Esta recuperación requiere publicar e instalar la versión del plugin que la incluye;
+las instalaciones anteriores conservan su comportamiento. Las pruebas locales CPT/HPOS
+no sustituyen la aceptación en una tienda alojada ni una medición de la latencia real.
+
 Si un comprador pagó Q100 pero WooCommerce sigue mostrando la orden pendiente, el plugin consulta
 `GET /checkouts/{id}` y después `GET /intents/{id}` con la llave secreta del ambiente original.
 Solo concilia si el checkout está pagado, el intent está confirmado y ambos conservan la misma
@@ -117,14 +121,20 @@ La consulta se puede iniciar de tres formas:
 - Al regresar a la confirmación de WooCommerce con la clave correcta de la orden. Para órdenes de
   clientes registrados también se exige su sesión o un usuario con permiso para editar la orden.
 - Desde **Acciones de la orden → Consultar pago en Recurrente**, con permiso de edición y el nonce
-  del formulario de WooCommerce. El resultado queda como nota privada de la orden.
+  del formulario de WooCommerce. Mientras consulta, bloquea un segundo envío y muestra
+  **Consultando a Recurrente…**. El aviso final aparece una sola vez en esa orden para el
+  usuario que hizo la consulta. Los resultados quedan como notas privadas atribuidas a ese
+  usuario; una consulta demasiado reciente o una orden que ya dejó de estar pendiente no
+  agrega una nota permanente.
 - Cada cinco minutos, con Action Scheduler o WP-Cron como respaldo. Cada revisión busca hasta 20
   órdenes pendientes o en espera, de entre dos minutos y siete días de antigüedad, y programa una
   tarea por orden. La paginación avanza aunque una orden siga impaga. El retorno y la acción
   administrativa también permiten revisar órdenes más antiguas.
 
 Las consultas por orden tienen un intervalo mínimo de un minuto, incluso si la API falla; el
-retorno repetido no genera llamadas ilimitadas. Cada GET tiene un timeout de diez segundos. Un
+retorno repetido no genera llamadas ilimitadas. El retorno espera la consulta antes de mostrar
+la confirmación y los permisos de descarga. Cada GET tiene un timeout de diez segundos; ese
+límite por llamada no es un presupuesto total del retorno ni de la espera por los bloqueos. Un
 error o una identidad incompatible deja la orden pendiente para un intento posterior. No se crea
 otro checkout, no se vuelve a cobrar ni se cambia una orden cancelada, fallida o reembolsada.
 Las renovaciones de suscripciones siguen dependiendo de sus webhooks. Action Scheduler y WP-Cron
