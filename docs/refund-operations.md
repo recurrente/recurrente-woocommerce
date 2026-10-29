@@ -38,8 +38,10 @@ admin nonce / REST permissions and `edit_shop_order` authorization still apply.
 Only an identified `succeeded` refund for the exact customer amount and currency returns
 gateway success. The actual account credit can differ because of fees; it is never used
 as the customer amount. A `pending`, missing/malformed resource, transport error or
-unlinked rejection returns `WP_Error`, so Woo deletes its provisional accounting and
-does not restock or mark the order refunded. A `422` with `refund_id` is resolved by GET,
+unlinked rejection returns `WP_Error`. When that native request finishes normally, Woo
+rolls back its provisional accounting without restocking or marking the order refunded.
+An interrupted request can leave a provisional row for review, as described below.
+A `422` with `refund_id` is resolved by GET,
 never interpreted from error text. Confirmed `failed`/`voided` resources are terminal
 without accounting; unknown outcomes continue blocking other operations.
 
@@ -116,19 +118,22 @@ of an independently created pending partial and same-key replay in an authorized
 
 No provider contact, live refund or backend deployment was performed by this PR.
 Actual provider support, credentials and an accessible signed webhook endpoint remain runtime
-requirements. Visual review of the native admin flow is **pending**.
+requirements. Claude's local design and motion reviews of the native admin flow completed
+on source commit `7592e0e31ccb3a9e3e63c37cc3d40ac83638654d`, with no open P0/P1 findings.
+The real CPT/HPOS fixtures and captured emails do not establish hosted/provider acceptance.
 
 ## Integration with task 7
 
 Payment recovery [PR #20](https://github.com/recurrente/recurrente-woocommerce/pull/20)
-is independent. Suggested order: integrate task 7, then this PR; preserve both additions to
-the gateway, bootstrap, README and translation catalog. The API client's fourth `request`
-argument conflicts: task 7 uses a timeout; this PR uses extra headers. Resolve deliberately
-with a combined options argument (or separate timeout/header arguments) and update every
-call site. A numeric timeout must never replace refund idempotency headers. Run both PHP
-regression sets, JavaScript tests and the CPT/HPOS integration tests on the combined tree.
-The CPT `meta_query` limitation found here also affects older generic charge-link lookups;
-this PR fixes only its refund eligibility query, without changing task 7's reconciliation.
+was merged and is already included in this branch. The combined API client's fourth
+`request` argument is an options array carrying `timeout` and `headers`. Payment-recovery
+GETs keep their 10-second timeout; refund POSTs keep the 30-second default and the stable
+`Idempotency-Key`. Both gateway/bootstrap hooks and translation catalogs are retained.
+
+The combined source passed 282 PHP regressions, 14 JavaScript tests, 34 real WordPress/Woo
+cases in each CPT/HPOS mode, and the independent-process concurrency checks in both modes.
+The native recovery-to-refund case verifies the 10/10/30-second request options together
+with the idempotency header and `require_new_refund: true`.
 
 ## Validation
 
