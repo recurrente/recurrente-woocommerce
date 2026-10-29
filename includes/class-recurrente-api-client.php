@@ -34,12 +34,21 @@ class Recurrente_API_Client {
 
 	/** Read the authoritative checkout, using its original environment key. */
 	public function get_checkout( $id, $timeout = 30 ) {
-		return $this->request( 'GET', '/checkouts/' . rawurlencode( $id ), null, $timeout );
+		return $this->request( 'GET', '/checkouts/' . rawurlencode( $id ), null, array( 'timeout' => $timeout ) );
 	}
 
 	/** The normalized API intent includes status, charge identity and checkout binding. */
 	public function get_intent( $id ) {
-		return $this->request( 'GET', '/intents/' . rawurlencode( $id ), null, 10 );
+		return $this->request( 'GET', '/intents/' . rawurlencode( $id ), null, array( 'timeout' => 10 ) );
+	}
+
+	/** The caller must persist the key and exact payload before sending money requests. */
+	public function create_refund( array $payload, $operation_key ) {
+		return $this->request( 'POST', '/refunds', $payload, array( 'headers' => array( 'Idempotency-Key' => $operation_key ) ) );
+	}
+
+	public function get_refund( $id ) {
+		return $this->request( 'GET', '/refunds/' . rawurlencode( $id ) );
 	}
 
 	/**
@@ -74,11 +83,11 @@ class Recurrente_API_Client {
 		return $this->request( 'POST', $path, $payload );
 	}
 
-	private function request( $method, $path, ?array $payload = null, $timeout = 30 ) {
+	private function request( $method, $path, ?array $payload = null, array $options = array() ) {
 		$args = array(
 			'method'  => $method,
-			'headers' => $this->headers(),
-			'timeout' => $timeout,
+			'headers' => array_merge( $this->headers(), $options['headers'] ?? array() ),
+			'timeout' => $options['timeout'] ?? 30,
 		);
 		if ( null !== $payload ) {
 			$args['body'] = wp_json_encode( $payload );
@@ -110,7 +119,7 @@ class Recurrente_API_Client {
 			return is_array( $body ) ? $body : array();
 		}
 		Recurrente_Telemetry::note_error( $this->error_code( $status ) );
-		throw new Recurrente_API_Exception( esc_html( $this->error_message( $body ) ), (int) $status );
+		throw new Recurrente_API_Exception( esc_html( $this->error_message( $body ) ), (int) $status, is_array( $body ) ? $body : array() );
 	}
 
 	private function error_code( $status ) {
@@ -126,4 +135,16 @@ class Recurrente_API_Client {
 	}
 }
 
-class Recurrente_API_Exception extends Exception {}
+class Recurrente_API_Exception extends Exception {
+	private $response_data;
+
+	public function __construct( $message, $code = 0, array $response_data = array() ) {
+		parent::__construct( $message, $code );
+		$this->response_data = $response_data;
+	}
+
+	/** A 422 may identify an existing refund. Never infer completion from its message. */
+	public function response_data() {
+		return $this->response_data;
+	}
+}

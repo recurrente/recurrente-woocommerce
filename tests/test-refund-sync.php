@@ -10,6 +10,7 @@
  */
 
 require_once __DIR__ . '/stubs-wordpress.php';
+recurrente_reset_renewal_world();
 
 if ( ! function_exists( '__' ) ) {
 	function __( $text, $domain = null ) {
@@ -52,6 +53,7 @@ class Stub_Refundable_Order {
 	public function get_currency() {
 		return $this->currency;
 	}
+	public function get_refunds() { return array(); }
 	public function get_remaining_refund_amount() {
 		return $this->total - $this->refunded;
 	}

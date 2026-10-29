@@ -58,6 +58,8 @@ class Recurrente_Plugin {
 		Recurrente_Pending_Payments::register_hooks();
 		Recurrente_Payment_Recovery::register_hooks();
 		Recurrente_Subscriptions::register_hooks();
+		Recurrente_Refund_Operations::register_hooks();
+		Recurrente_Refund_Sync::register_hooks();
 		Recurrente_Telemetry::register_hooks();
 	}
 

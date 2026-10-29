@@ -25,7 +25,8 @@ it( 'return: authenticated GETs recover a paid order and later signed twins neve
 		&& Recurrente_API_Client::BASE_URL . '/checkouts/ch_test' === $requests[0][0]
 		&& Recurrente_API_Client::BASE_URL . '/intents/in_recovered' === $requests[1][0]
 		&& 'GET' === $requests[0][1]['method'] && 'GET' === $requests[1][1]['method']
-		&& 'sk_live_fixture' === $requests[0][1]['headers']['X-SECRET-KEY'] && 10 === $requests[0][1]['timeout'];
+		&& 'sk_live_fixture' === $requests[0][1]['headers']['X-SECRET-KEY'] && 10 === $requests[0][1]['timeout']
+		&& 10 === $requests[1][1]['timeout'];
 } );
 
 foreach ( array( 'wrong key', 'array key', 'missing key', 'other customer', 'not received' ) as $invalid ) {

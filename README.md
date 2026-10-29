@@ -28,8 +28,8 @@ flujo sin pago de WooCommerce. Esta conciliación no modifica las suscripciones.
 
 El pago se marca por un webhook con firma Svix verificada o una consulta autenticada a Recurrente
 que confirma el checkout y su intent. El regreso por `success_url` solo dispara esa consulta;
-los parámetros del navegador nunca prueban que la orden está pagada. Un reembolso en Recurrente (total o parcial) reembolsa
-y reabastece la orden por el monto exacto; cada reembolso se aplica una sola vez.
+los parámetros del navegador nunca prueban que la orden está pagada. Un reembolso confirmado
+en Recurrente se sincroniza por el monto exacto del cliente; cada reembolso se aplica una sola vez.
 
 Soporta suscripciones (requiere **WooCommerce Subscriptions**): Recurrente es dueño del ciclo de cobro
 y sincroniza los estados por webhook. Compatible con HPOS y con el checkout por bloques (el default
@@ -189,7 +189,22 @@ Tests:
 
 ```shell
 php tests/run.php
+npm install --ignore-scripts
+npm test
 ```
+
+Contrato y pruebas de la iniciación de reembolsos desde la orden (implementación en Draft):
+[docs/refund-operations.md](docs/refund-operations.md).
+
+**Reembolsar vía Recurrente** usa el formulario nativo de WooCommerce;
+**Consultar reembolso de Recurrente** permite revisar la misma operación desde las acciones
+del pedido. Solo una devolución confirmada con el importe y la moneda originales confirma
+la contabilidad. Un resultado pendiente o desconocido conserva su identidad: no borres
+el journal ni solicites otra devolución para desbloquearlo. Una solicitud interrumpida
+puede conservar un registro provisional que necesita revisión.
+
+Su publicación requiere desplegar y verificar primero el contrato Rails `require_new_refund`
+de [#7311](https://github.com/recurrente/recurrente-app/pull/7311); no publicar este cambio de forma independiente.
 
 ## Licencia
 

@@ -10,6 +10,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once __DIR__ . '/class-recurrente-order-lock.php';
+require_once __DIR__ . '/class-recurrente-refund-operations.php';
 
 class Recurrente_Gateway extends WC_Payment_Gateway {
 
@@ -53,7 +54,7 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 	}
 
 	private function supported_features() {
-		$base = array( 'products' );
+		$base = array( 'products', 'refunds' );
 		if ( ! class_exists( 'WC_Subscriptions' ) ) {
 			return $base;
 		}
@@ -198,6 +199,10 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 			Recurrente_Logger::error( 'order locked by another request', array( 'order' => $order_id ) );
 			return $this->fail( __( 'Ya estamos procesando tu pago con Recurrente. Volvé a intentar en unos segundos.', 'recurrente-for-woocommerce' ) );
 		}
+	}
+
+	public function process_refund( $order_id, $amount = null, $reason = '' ) {
+		return Recurrente_Refund_Operations::process( $order_id, $amount, $reason );
 	}
 
 	/**
