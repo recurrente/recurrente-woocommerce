@@ -233,6 +233,31 @@ try {
 		woo13_accounted( $order, 0, 0 );
 	} );
 
+	woo13_case( 'query after an interrupted native request reports a Spanish support error without replacing its identity', function () use ( &$remote, &$calls ) {
+		$order = woo13_order();
+		$resource = woo13_resource( 'Interrupted' . $order->get_id() );
+		$remote = function () { throw new Error( 'Fixture request interrupted at the external HTTP boundary' ); };
+		try {
+			woo13_native( $order );
+			throw new RuntimeException( 'Fixture interruption did not occur' );
+		} catch ( Error $e ) {
+			woo13_assert( false !== strpos( $e->getMessage(), 'Fixture request interrupted' ), 'Unexpected interruption' );
+		}
+		Recurrente_Refund_Operations::release_native();
+		$original = current( woo13_operations( $order ) );
+		$remote = function () use ( $resource ) { return woo13_response( $resource ); };
+		do_action( 'woocommerce_order_action_recurrente_check_refund', $order );
+		$notes = array_map( function ( $note ) { return $note->content; }, wc_get_order_notes( array( 'order_id' => $order->get_id(), 'limit' => 20 ) ) );
+		$text = implode( ' ', $notes );
+		woo13_assert( false !== strpos( $text, 'No se pudo registrar este reembolso en WooCommerce' ), 'Merchant did not receive the Spanish support error' );
+		woo13_assert( false === strpos( $text, 'Native Woo refund has not finished' ), 'Internal English error leaked into the order notes' );
+		woo13_assert( 2 === count( $calls ) && $calls[0]['args']['headers']['Idempotency-Key'] === $calls[1]['args']['headers']['Idempotency-Key']
+			&& $calls[0]['args']['body'] === $calls[1]['args']['body'], 'Recovery replaced the original monetary request' );
+		$operation = current( woo13_operations( $order ) );
+		woo13_assert( $original['wc_refund_id'] === $operation['wc_refund_id'] && ! $operation['native_accepted'], 'Unfinished native evidence changed' );
+		$fresh = wc_get_order( $order->get_id() );
+		woo13_assert( 1 === count( $fresh->get_refunds() ) && ! $fresh->get_meta( Recurrente_Refund_Sync::APPLIED_META ), 'Unfinished refund was duplicated or marked applied' );
+	} );
 	woo13_case( 'equal partials receive distinct durable operation identities', function () use ( &$remote, &$calls ) {
 		$order = woo13_order();
 		$sequence = 0;

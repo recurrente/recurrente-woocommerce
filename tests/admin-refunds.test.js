@@ -8,11 +8,15 @@ const source = fs.readFileSync('assets/js/admin-refunds.js', 'utf8');
 function browser(storage = new Map(), terminalKeys = [], crypto = { randomUUID }) {
   let prefilter;
   const alerts = [];
+  const jQuery = () => ({ length: 0, unblock() {}, off() { return this; }, on() { return this; } });
+  jQuery.ajaxPrefilter = (callback) => { prefilter = callback; };
   vm.runInNewContext(source, {
     URLSearchParams,
+    document: { readyState: 'loading' },
     recurrenteRefunds: { orderId: '42', terminalKeys, blocked: 'Blocked safely' },
-    jQuery: { ajaxPrefilter(callback) { prefilter = callback; } },
+    jQuery,
     window: {
+      addEventListener() {},
       crypto, alert(message) { alerts.push(message); },
       sessionStorage: {
         getItem(key) { return storage.get(key) || null; },

@@ -1,0 +1,15 @@
+.recurrente-refund-check-pending .spinner {
+	float: none;
+	margin: 0 6px 0 0;
+	vertical-align: middle;
+}
+
+.recurrente-refund-check-pending[hidden] {
+	display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.recurrente-refund-check-pending .spinner {
+		display: none;
+	}
+}

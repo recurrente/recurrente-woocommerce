@@ -3,13 +3,13 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Recurrente for WooCommerce 0.1.3\n"
-"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/recurrente-woocommerce\n"
+"Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/woo-payment-binding\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-07-16T18:54:18+00:00\n"
+"POT-Creation-Date: 2026-10-28T20:14:53-06:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: recurrente-for-woocommerce\n"
@@ -31,11 +31,12 @@ msgid "Cobra en WooCommerce con Recurrente — checkout hospedado, tarjetas, tra
 msgstr ""
 
 #. Author of the plugin
-#: recurrente-payments.php includes/class-recurrente-gateway.php:18
+#: recurrente-payments.php
+#: includes/class-recurrente-gateway.php:21
 msgid "Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-api-client.php:107
+#: includes/class-recurrente-api-client.php:134
 msgid "Error al comunicarse con Recurrente."
 msgstr ""
 
@@ -43,214 +44,196 @@ msgstr ""
 msgid "Cuota de inscripción"
 msgstr ""
 
+#. translators: %s: número de pedido de WooCommerce
+#: includes/class-recurrente-checkout-builder.php:174
+#, php-format
+msgid "Pedido #%s"
+msgstr ""
+
 #. translators: %s: nombre del método de envío
-#: includes/class-recurrente-checkout-builder.php:169
+#: includes/class-recurrente-checkout-builder.php:200
 #, php-format
 msgid "Envío: %s"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:19
+#: includes/class-recurrente-gateway.php:22
 msgid "Acepta tarjetas, transferencias y suscripciones con el checkout hospedado de Recurrente."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:52
+#: includes/class-recurrente-gateway.php:73
 msgid "General"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:56
+#: includes/class-recurrente-gateway.php:77
 msgid "Activar/Desactivar"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:58
+#: includes/class-recurrente-gateway.php:79
 msgid "Activar Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:62
+#: includes/class-recurrente-gateway.php:83
 msgid "Título"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:64
+#: includes/class-recurrente-gateway.php:85
 msgid "Lo que ve el cliente al elegir el método de pago."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:65
+#: includes/class-recurrente-gateway.php:86
 msgid "Tarjeta, transferencia o cuotas (Recurrente)"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:69
+#: includes/class-recurrente-gateway.php:90
 msgid "Descripción"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:71
+#: includes/class-recurrente-gateway.php:92
 msgid "Pagá de forma segura con Recurrente. Te redirigiremos para completar tu pago."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:74
+#: includes/class-recurrente-gateway.php:95
 msgid "Opciones de checkout"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:76
+#: includes/class-recurrente-gateway.php:97
 msgid "Qué métodos y cuotas ve el comprador. Dejá vacío para heredar la configuración de tu cuenta de Recurrente."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:79
+#: includes/class-recurrente-gateway.php:100
 msgid "Métodos de pago"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:83
+#: includes/class-recurrente-gateway.php:104
 msgid "Tarjeta"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:84
+#: includes/class-recurrente-gateway.php:105
 msgid "Transferencia bancaria"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:85
+#: includes/class-recurrente-gateway.php:106
 msgid "Balance Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:86
+#: includes/class-recurrente-gateway.php:107
 msgid "Dólares digitales (stablecoins)"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:88
+#: includes/class-recurrente-gateway.php:109
 msgid "Métodos que ve el comprador en el checkout. Dejalo vacío para usar la configuración de tu cuenta de Recurrente."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:92
+#: includes/class-recurrente-gateway.php:113
 msgid "Cuotas (meses)"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:96
+#: includes/class-recurrente-gateway.php:117
 msgid "3 meses"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:97
+#: includes/class-recurrente-gateway.php:118
 msgid "6 meses"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:98
+#: includes/class-recurrente-gateway.php:119
 msgid "12 meses"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:99
+#: includes/class-recurrente-gateway.php:120
 msgid "18 meses"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:101
+#: includes/class-recurrente-gateway.php:122
 msgid "Opciones de cuotas a mostrar. Solo aplica a GTQ y requiere tarjeta habilitada. Vacío = sin cuotas o según tu cuenta."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:105
+#: includes/class-recurrente-gateway.php:126
 msgid "Precio dinámico"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:107
+#: includes/class-recurrente-gateway.php:128
 msgid "Cobrar recargo según el método de pago"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:108
+#: includes/class-recurrente-gateway.php:129
 msgid "Si se activa, Recurrente suma un recargo cuando el comprador elige un método más costoso (ej. tarjeta). El monto base sigue siendo el total de la orden. Nota: con precio dinámico Recurrente muestra todos los métodos y cuotas disponibles para comparar precios, ignorando las restricciones de arriba."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:113
+#: includes/class-recurrente-gateway.php:134
 msgid "Producción"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:115
+#: includes/class-recurrente-gateway.php:136
 msgid "Se usa cuando el modo de pruebas está desactivado. Cobros reales."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:118
+#: includes/class-recurrente-gateway.php:139
 msgid "Llave secreta de producción"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:120
+#: includes/class-recurrente-gateway.php:141
 msgid "Recurrente → Configuración → Llaves API."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:124
+#: includes/class-recurrente-gateway.php:145
 msgid "Modo de pruebas (sandbox)"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:126
+#: includes/class-recurrente-gateway.php:147
 msgid "Todo lo que necesitás para probar sin cobros reales: activá el modo de pruebas, pegá tu llave secreta de pruebas y pagá con la tarjeta 4242 4242 4242 4242. Los pagos de prueba disparan webhooks simulados, así que también se prueba la conciliación de la orden — para eso el sitio necesita una URL pública (Live Link o túnel); en localhost la orden queda en \"pendiente\"."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:129
+#: includes/class-recurrente-gateway.php:150
 msgid "Activar modo de pruebas"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:131
+#: includes/class-recurrente-gateway.php:152
 msgid "Usar la llave de pruebas en vez de la de producción"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:135
+#: includes/class-recurrente-gateway.php:156
 msgid "Llave secreta de pruebas"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:137
+#: includes/class-recurrente-gateway.php:158
 msgid "Recurrente → Configuración → Llaves API (llave de test)."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:141
+#: includes/class-recurrente-gateway.php:162
 msgid "Avanzado"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:145
+#: includes/class-recurrente-gateway.php:166
 msgid "Registro de depuración"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:147
+#: includes/class-recurrente-gateway.php:168
 msgid "Registrar eventos en WooCommerce → Estado → Registros"
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:199
+#: includes/class-recurrente-gateway.php:200
+msgid "Ya estamos procesando tu pago con Recurrente. Volvé a intentar en unos segundos."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:235
 msgid "Recurrente solo acepta GTQ y USD."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:210
+#: includes/class-recurrente-gateway.php:251
+msgid "Recurrente no inició el cobro: el total de la orden no coincide con la suma de sus productos, envío y cargos. Revisá los plugins que modifican el total."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:252
+msgid "No pudimos iniciar el pago con Recurrente. Elegí otro método de pago o contactá a la tienda."
+msgstr ""
+
+#: includes/class-recurrente-gateway.php:262
 msgid "No pudimos iniciar el pago con Recurrente. Intentá de nuevo."
 msgstr ""
 
-#: includes/class-recurrente-gateway.php:216
+#: includes/class-recurrente-gateway.php:277
 msgid "Esperando pago en Recurrente."
-msgstr ""
-
-#: includes/class-recurrente-plugin.php:73
-msgid "Configuración"
-msgstr ""
-
-#: includes/class-recurrente-plugin.php:79
-msgid "Recurrente para WooCommerce requiere que WooCommerce esté instalado y activo."
-msgstr ""
-
-#: includes/class-recurrente-subscriptions.php:69
-msgid "Actualizado por webhook de Recurrente."
-msgstr ""
-
-#: includes/class-recurrente-webhook-handler.php:141
-msgid "Reembolsado en Recurrente."
-msgstr ""
-
-#. translators: %s: "pruebas" o "producción"
-#: includes/class-recurrente-webhook-registrar.php:97
-#, php-format
-msgid "La llave secreta de %s es inválida. Verificá que sea tu llave secreta de Recurrente (Configuración → Llaves API)."
-msgstr ""
-
-#. translators: %s: "pruebas" o "producción"
-#: includes/class-recurrente-webhook-registrar.php:107
-#, php-format
-msgid "No se pudo registrar el webhook de Recurrente (%s). Intentá guardar de nuevo en unos minutos."
-msgstr ""
-
-#: includes/class-recurrente-webhook-registrar.php:113
-msgid "pruebas"
-msgstr ""
-
-#: includes/class-recurrente-webhook-registrar.php:113
-msgid "producción"
 msgstr ""
 
 #: includes/class-recurrente-payment-recovery.php:34
@@ -293,84 +276,168 @@ msgstr ""
 msgid "Cada cinco minutos"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:39
-msgid "No se pudo conservar la identidad del reembolso. Recargá la orden y consultá su estado antes de intentar otro."
+#: includes/class-recurrente-plugin.php:84
+msgid "Configuración"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:53
-msgid "No se pudo identificar esta solicitud de reembolso. Recargá la orden y consultá su estado antes de intentar otro."
+#: includes/class-recurrente-plugin.php:90
+msgid "Recurrente para WooCommerce requiere que WooCommerce esté instalado y activo."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:82
+#: includes/class-recurrente-refund-admin.php:32
+msgid "Consultando el reembolso en Recurrente…"
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:47
+msgid "Reembolso confirmado y registrado en WooCommerce."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:49
+msgid "No se envió esta solicitud: el navegador no pudo guardar sus datos. Usá «Consultar reembolso de Recurrente» en Acciones del pedido para revisar la solicitud pendiente."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:50
+msgid "No se envió esta solicitud: este navegador no pudo guardar sus datos. Abrí el pedido en una pestaña nueva y volvé a intentarlo."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:64
+msgid "No se pudo identificar esta solicitud de reembolso. Recargá el pedido antes de volver a intentarlo."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:93
 msgid "Hay un reembolso de WooCommerce en curso. Volvé a consultar en unos segundos."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:115
+#: includes/class-recurrente-refund-operations.php:125
 msgid "Consultar reembolso de Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:177
-msgid "No tenés permiso para reembolsar esta orden."
+#: includes/class-recurrente-refund-operations.php:149
+msgid "No se pudo consultar este reembolso. Esperá unos segundos y volvé a intentarlo."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:188
-msgid "Ya existe una solicitud de reembolso. Usá la acción «Consultar reembolso de Recurrente» antes de solicitar otro."
+#: includes/class-recurrente-refund-operations.php:154
+msgid "No se pudo registrar este reembolso en WooCommerce. Contactá a soporte de Recurrente con el número de pedido."
 msgstr ""
 
 #: includes/class-recurrente-refund-operations.php:206
-msgid "Iniciá el reembolso desde el formulario de reembolsos de la orden."
+msgid "No tenés permiso para reembolsar este pedido."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:223
-msgid "No se pudo verificar el pago original y su ambiente. Reconciliá la orden con soporte antes de reembolsar."
+#: includes/class-recurrente-refund-operations.php:217
+msgid "Ya existe una solicitud de reembolso. Usá la acción «Consultar reembolso de Recurrente» antes de solicitar otro."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:244
+#: includes/class-recurrente-refund-operations.php:235
+msgid "Iniciá el reembolso desde el formulario de reembolsos del pedido."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:252
+msgid "No se puede reembolsar este pedido mediante Recurrente porque no encontramos su pago original. Contactá a soporte de Recurrente."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:273
 msgid "El monto debe ser positivo y no superar el saldo reembolsable."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:262
+#: includes/class-recurrente-refund-operations.php:292
 msgid "El monto del reembolso debe tener como máximo dos decimales."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:271
-msgid "Falta la llave del ambiente original de la orden."
+#: includes/class-recurrente-refund-operations.php:301
+msgid "Falta la llave del ambiente original del pedido."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:279
+#: includes/class-recurrente-refund-operations.php:309
 msgid "Resultado desconocido fuera de la ventana segura. Soporte debe reconciliar la solicitud original; no generés otra."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:332
-msgid "El reembolso remoto no coincide con la solicitud original. Requiere reconciliación con soporte."
+#: includes/class-recurrente-refund-operations.php:362
+msgid "El reembolso en Recurrente no coincide con este pedido (monto o moneda). No lo registramos en WooCommerce; contactá a soporte de Recurrente."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:433
-msgid "resultado desconocido; no solicités otro reembolso"
+#: includes/class-recurrente-refund-operations.php:469
+msgid "No hay solicitudes de reembolso pendientes."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:434
-msgid "pendiente; todavía no se registró como reembolsado en WooCommerce"
+#. translators: %s: refund amount formatted by WooCommerce.
+#: includes/class-recurrente-refund-operations.php:482
+#, php-format
+msgid "Solicitud de reembolso de %s registrada."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:435
+#: includes/class-recurrente-refund-operations.php:493
+msgid "sin confirmar; no solicités otro reembolso"
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:494
+msgid "pendiente en Recurrente; todavía no se registró en WooCommerce"
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:495
 msgid "confirmado en Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:436
-msgid "fallido; no se confirmó devolución de dinero"
+#: includes/class-recurrente-refund-operations.php:496
+msgid "fallido; Recurrente no confirmó devolución de dinero"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:437
-msgid "anulado"
+#: includes/class-recurrente-refund-operations.php:497
+msgid "anulado en Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:438
-msgid "confirmado y registrado en WooCommerce; no se volvió a reembolsar"
+#: includes/class-recurrente-refund-operations.php:498
+msgid "confirmado y registrado en WooCommerce"
 msgstr ""
 
-#. translators: 1: operation key, 2: remote id, 3: amount, 4: currency, 5: state
-#: includes/class-recurrente-refund-operations.php:441
+#. translators: 1: formatted refund amount, 2: refund status.
+#: includes/class-recurrente-refund-operations.php:501
 #, php-format
-msgid "Reembolso %1$s (%2$s), %3$s %4$s: %5$s. Consultá su estado con la acción «Consultar reembolso de Recurrente»."
+msgid "Reembolso de %1$s %2$s."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:503
+msgid "Para actualizarlo, elegí «Consultar reembolso de Recurrente» en Acciones del pedido."
+msgstr ""
+
+#. translators: %s: Recurrente refund id
+#: includes/class-recurrente-refund-sync.php:119
+#, php-format
+msgid "Reembolsado en Recurrente (%s)."
+msgstr ""
+
+#. translators: 1: refund id, 2: amount, 3: currency
+#: includes/class-recurrente-refund-sync.php:145
+#, php-format
+msgid "Reembolso de Recurrente %1$s por %2$s %3$s no aplicado: supera el monto reembolsable restante de la orden."
+msgstr ""
+
+#. translators: 1: refund id, 2: amount, 3: currency
+#: includes/class-recurrente-refund-sync.php:147
+#, php-format
+msgid "Reembolso de Recurrente %1$s por %2$s %3$s no aplicado: la moneda no coincide con la de la orden."
+msgstr ""
+
+#: includes/class-recurrente-subscriptions.php:70
+msgid "Actualizado por webhook de Recurrente."
+msgstr ""
+
+#. translators: %s: "pruebas" o "producción"
+#: includes/class-recurrente-webhook-registrar.php:119
+#, php-format
+msgid "La llave secreta de %s es inválida. Verificá que sea tu llave secreta de Recurrente (Configuración → Llaves API)."
+msgstr ""
+
+#. translators: %s: "pruebas" o "producción"
+#: includes/class-recurrente-webhook-registrar.php:129
+#, php-format
+msgid "No se pudo registrar el webhook de Recurrente (%s). Intentá guardar de nuevo en unos minutos."
+msgstr ""
+
+#: includes/class-recurrente-webhook-registrar.php:135
+msgid "pruebas"
+msgstr ""
+
+#: includes/class-recurrente-webhook-registrar.php:135
+msgid "producción"
 msgstr ""

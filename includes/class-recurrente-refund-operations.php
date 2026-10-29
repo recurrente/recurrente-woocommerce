@@ -1,6 +1,7 @@
 <?php
 /** Durable outbound refund requests. All journal changes run under the order lock. */
 if ( ! defined( 'ABSPATH' ) ) { exit; }
+require_once __DIR__ . '/class-recurrente-refund-admin.php';
 
 class Recurrente_Refund_Operations {
 	const META = '_recurrente_refund_operations';
@@ -21,6 +22,7 @@ class Recurrente_Refund_Operations {
 		add_action( 'woocommerce_order_action_recurrente_check_refund', array( __CLASS__, 'check_order' ) );
 		add_action( 'shutdown', array( __CLASS__, 'release_native' ) );
 		add_action( 'admin_enqueue_scripts', array( __CLASS__, 'admin_script' ) );
+		Recurrente_Refund_Admin::register_hooks();
 	}
 
 	public static function admin_script() {
@@ -29,14 +31,23 @@ class Recurrente_Refund_Operations {
 		$order_id = absint( $_GET['id'] ?? $_GET['post'] ?? 0 );
 		$order = wc_get_order( $order_id );
 		if ( ! $order || 'recurrente' !== $order->get_payment_method() || ! current_user_can( 'edit_shop_order', $order_id ) ) { return; }
-		wp_enqueue_script( 'recurrente-admin-refunds', plugins_url( 'assets/js/admin-refunds.js', RECURRENTE_PLUGIN_FILE ), array( 'jquery' ), RECURRENTE_PLUGIN_VERSION, true );
+		wp_enqueue_script( 'recurrente-admin-refunds', plugins_url( 'assets/js/admin-refunds.js', RECURRENTE_PLUGIN_FILE ), array( 'jquery', 'wp-a11y' ), RECURRENTE_PLUGIN_VERSION, true );
+		wp_enqueue_script( 'recurrente-admin-refund-check', plugins_url( 'assets/js/admin-refund-check.js', RECURRENTE_PLUGIN_FILE ), array(), RECURRENTE_PLUGIN_VERSION, true );
+		wp_enqueue_style( 'recurrente-admin-refunds', plugins_url( 'assets/css/admin-refunds.css', RECURRENTE_PLUGIN_FILE ), array(), RECURRENTE_PLUGIN_VERSION );
 		$journal = new self( $order );
 		$terminal = array_keys( array_filter( $journal->operations, function ( $operation ) {
 			return in_array( $operation['state'], array( 'completed', 'failed', 'voided' ), true );
 		} ) );
+		$refund_rows = array();
+		foreach ( $journal->operations as $key => $operation ) {
+			if ( 'completed' === $operation['state'] ) { $refund_rows[ $key ] = $operation['wc_refund_id']; }
+		}
 		wp_localize_script( 'recurrente-admin-refunds', 'recurrenteRefunds', array(
-			'orderId' => (string) $order_id, 'terminalKeys' => $terminal,
-			'blocked' => __( 'No se pudo conservar la identidad del reembolso. Recargá la orden y consultá su estado antes de intentar otro.', 'recurrente-for-woocommerce' ),
+			'orderId' => (string) $order_id, 'terminalKeys' => $terminal, 'refundRows' => $refund_rows,
+			'success' => __( 'Reembolso confirmado y registrado en WooCommerce.', 'recurrente-for-woocommerce' ),
+			'blocked' => $journal->active_key()
+				? __( 'No se envió esta solicitud: el navegador no pudo guardar sus datos. Usá «Consultar reembolso de Recurrente» en Acciones del pedido para revisar la solicitud pendiente.', 'recurrente-for-woocommerce' )
+				: __( 'No se envió esta solicitud: este navegador no pudo guardar sus datos. Abrí el pedido en una pestaña nueva y volvé a intentarlo.', 'recurrente-for-woocommerce' ),
 		) );
 	}
 
@@ -50,7 +61,7 @@ class Recurrente_Refund_Operations {
 		self::cents( $args['amount'] );
 		$token = $_SERVER['HTTP_X_RECURRENTE_REFUND_OPERATION'] ?? '';
 		if ( ! empty( $args['refund_id'] ) || ! is_string( $token ) || ! preg_match( '/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/D', $token ) ) {
-			throw new RuntimeException( __( 'No se pudo identificar esta solicitud de reembolso. Recargá la orden y consultá su estado antes de intentar otro.', 'recurrente-for-woocommerce' ) );
+			throw new RuntimeException( __( 'No se pudo identificar esta solicitud de reembolso. Recargá el pedido antes de volver a intentarlo.', 'recurrente-for-woocommerce' ) );
 		}
 		self::acquire_native( $order->get_id() );
 		self::$native_locks[ $order->get_id() ] = true;
@@ -110,11 +121,15 @@ class Recurrente_Refund_Operations {
 	}
 
 	public static function order_actions( $actions, $order ) {
-		if ( $order && 'recurrente' === $order->get_payment_method() && $order->get_meta( self::META )
-			&& current_user_can( 'edit_shop_order', $order->get_id() ) ) {
+		if ( self::can_check( $order ) ) {
 			$actions['recurrente_check_refund'] = __( 'Consultar reembolso de Recurrente', 'recurrente-for-woocommerce' );
 		}
 		return $actions;
+	}
+
+	public static function can_check( $order ) {
+		return $order && 'recurrente' === $order->get_payment_method()
+			&& current_user_can( 'edit_shop_order', $order->get_id() ) && ( new self( $order ) )->active_key();
 	}
 
 	/** Explicit order action; reads a known ID, or retries the original body/key within 23h. */
@@ -122,14 +137,28 @@ class Recurrente_Refund_Operations {
 		if ( ! current_user_can( 'edit_shop_order', $order->get_id() ) ) { return; }
 		try {
 			self::authorize( $order->get_id() );
-			Recurrente_Order_Lock::run( $order->get_id(), function ( $fresh ) {
-				self::without_native_request( $fresh->get_id(), function () use ( $fresh ) {
+			$notice = Recurrente_Order_Lock::run( $order->get_id(), function ( $fresh ) {
+				return self::without_native_request( $fresh->get_id(), function () use ( $fresh ) {
 					( new self( $fresh ) )->reconcile();
+					$fresh->read_meta_data( true );
+					return ( new self( $fresh ) )->result_message();
 				} );
 			} );
+		} catch ( Recurrente_Order_Locked | Recurrente_Charge_Locked $e ) {
+			Recurrente_Logger::error( $e->getMessage(), array( 'order_id' => $order->get_id() ) );
+			$message = __( 'No se pudo consultar este reembolso. Esperá unos segundos y volvé a intentarlo.', 'recurrente-for-woocommerce' );
+			$order->add_order_note( $message );
+			$notice = array( 'type' => 'warning', 'message' => $message );
+		} catch ( Recurrente_Refund_Failed $e ) {
+			Recurrente_Logger::error( $e->getMessage(), array( 'order_id' => $order->get_id() ) );
+			$message = __( 'No se pudo registrar este reembolso en WooCommerce. Contactá a soporte de Recurrente con el número de pedido.', 'recurrente-for-woocommerce' );
+			$order->add_order_note( $message );
+			$notice = array( 'type' => 'error', 'message' => $message );
 		} catch ( RuntimeException $e ) {
 			$order->add_order_note( $e->getMessage() );
+			$notice = array( 'type' => 'warning', 'message' => $e->getMessage() );
 		}
+		Recurrente_Refund_Admin::remember_result( $order->get_id(), $notice );
 	}
 
 	/** Returns true when native Woo accounting already exists; unknown origins stay retryable. */
@@ -174,7 +203,7 @@ class Recurrente_Refund_Operations {
 
 	private static function authorize( $order_id ) {
 		if ( ! current_user_can( 'edit_shop_order', $order_id ) ) {
-			throw new RuntimeException( __( 'No tenés permiso para reembolsar esta orden.', 'recurrente-for-woocommerce' ) );
+			throw new RuntimeException( __( 'No tenés permiso para reembolsar este pedido.', 'recurrente-for-woocommerce' ) );
 		}
 	}
 
@@ -182,7 +211,7 @@ class Recurrente_Refund_Operations {
 		$context = $this->native_context( $amount, $reason );
 		$key = 'woo_refund_' . $context['refund']->get_meta( self::OPERATION_META );
 		if ( isset( $this->operations[ $key ] ) ) {
-			throw new RuntimeException( $this->status_message( $key ) );
+			throw new RuntimeException( $this->status_message( $key, false ) );
 		}
 		if ( $this->active_key() ) {
 			throw new RuntimeException( __( 'Ya existe una solicitud de reembolso. Usá la acción «Consultar reembolso de Recurrente» antes de solicitar otro.', 'recurrente-for-woocommerce' ) );
@@ -190,7 +219,7 @@ class Recurrente_Refund_Operations {
 		$key = $this->prepare( $context );
 		$resource = $this->send( $key );
 		if ( 'succeeded' !== $this->operations[ $key ]['state'] ) {
-			throw new RuntimeException( $this->status_message( $key ) );
+			throw new RuntimeException( $this->status_message( $key, false ) );
 		}
 		$this->update( $key, array( 'native_accepted' => true ) );
 		$context['refund']->update_meta_data( self::REMOTE_META, $resource['id'] );
@@ -203,7 +232,7 @@ class Recurrente_Refund_Operations {
 		if ( ! $context || ! $context['refund']->get_id() || $context['refund']->get_parent_id() !== $this->order->get_id()
 			|| self::cents( $amount ) !== self::cents( $context['refund']->get_amount() )
 			|| (string) $reason !== (string) $context['refund']->get_reason() ) {
-			throw new RuntimeException( __( 'Iniciá el reembolso desde el formulario de reembolsos de la orden.', 'recurrente-for-woocommerce' ) );
+			throw new RuntimeException( __( 'Iniciá el reembolso desde el formulario de reembolsos del pedido.', 'recurrente-for-woocommerce' ) );
 		}
 		return $context;
 	}
@@ -220,7 +249,7 @@ class Recurrente_Refund_Operations {
 			|| ! in_array( $this->order->get_currency(), array( 'GTQ', 'USD' ), true )
 			|| ( isset( $binding['amount'] ) && $binding['amount'] !== self::cents( $this->order->get_total() ) )
 			|| ( isset( $binding['currency'] ) && $binding['currency'] !== $this->order->get_currency() ) ) {
-			throw new RuntimeException( __( 'No se pudo verificar el pago original y su ambiente. Reconciliá la orden con soporte antes de reembolsar.', 'recurrente-for-woocommerce' ) );
+			throw new RuntimeException( __( 'No se puede reembolsar este pedido mediante Recurrente porque no encontramos su pago original. Contactá a soporte de Recurrente.', 'recurrente-for-woocommerce' ) );
 		}
 		return array( 'intent' => $intent, 'mode' => $mode, 'currency' => $this->order->get_currency() );
 	}
@@ -254,7 +283,7 @@ class Recurrente_Refund_Operations {
 				'restock_items' => ! empty( $context['args']['restock_items'] ) ),
 		) );
 		$this->persist();
-		$this->order->add_order_note( $this->status_message( $key ) );
+		$this->order->add_order_note( $this->requested_message( $key ) );
 		return $key;
 	}
 
@@ -269,7 +298,7 @@ class Recurrente_Refund_Operations {
 		$settings = get_option( 'woocommerce_recurrente_settings', array() );
 		$key = $settings[ $operation['mode'] . '_secret_key' ] ?? '';
 		if ( ! is_string( $key ) || '' === trim( $key ) ) {
-			throw new RuntimeException( __( 'Falta la llave del ambiente original de la orden.', 'recurrente-for-woocommerce' ) );
+			throw new RuntimeException( __( 'Falta la llave del ambiente original del pedido.', 'recurrente-for-woocommerce' ) );
 		}
 		return new Recurrente_API_Client( $key );
 	}
@@ -284,7 +313,7 @@ class Recurrente_Refund_Operations {
 		} catch ( Recurrente_API_Exception $e ) {
 			$data = $e->response_data();
 			if ( ! self::valid_id( $data['refund_id'] ?? null ) ) {
-				throw new RuntimeException( $this->status_message( $key ) );
+				$this->report_status_failure( $key );
 			}
 			$this->update( $key, array( 'refund_id' => $data['refund_id'] ) );
 			$resource = $this->read( $key );
@@ -297,7 +326,7 @@ class Recurrente_Refund_Operations {
 		try {
 			return $this->client( $operation )->get_refund( $operation['refund_id'] );
 		} catch ( Recurrente_API_Exception $e ) {
-			throw new RuntimeException( $this->status_message( $key ) );
+			$this->report_status_failure( $key );
 		}
 	}
 
@@ -309,7 +338,7 @@ class Recurrente_Refund_Operations {
 		$id = $resource['id'] ?? null;
 		$expected = $this->operations[ $key ]['refund_id'];
 		if ( ! self::valid_id( $id ) || ( $expected && $id !== $expected ) ) {
-			throw new RuntimeException( $this->status_message( $key ) );
+			$this->report_status_failure( $key );
 		}
 		$this->update( $key, array( 'refund_id' => $id ) );
 		$this->validate_resource( $key, $resource );
@@ -330,7 +359,9 @@ class Recurrente_Refund_Operations {
 			|| $operation['currency'] !== ( $resource['currency'] ?? null )
 			|| ! in_array( $resource['status'] ?? '', array( 'pending', 'succeeded', 'failed', 'voided' ), true )
 			|| ( $resource['refund_application_fee'] ?? false ) !== false ) {
-			throw new RuntimeException( __( 'El reembolso remoto no coincide con la solicitud original. Requiere reconciliación con soporte.', 'recurrente-for-woocommerce' ) );
+			$message = __( 'El reembolso en Recurrente no coincide con este pedido (monto o moneda). No lo registramos en WooCommerce; contactá a soporte de Recurrente.', 'recurrente-for-woocommerce' );
+			$this->order->add_order_note( $message . $this->status_reference( $key, true ) );
+			throw new RuntimeException( $message . $this->status_reference( $key, false ) );
 		}
 	}
 
@@ -428,18 +459,49 @@ class Recurrente_Refund_Operations {
 		$this->order->save();
 	}
 
-	private function status_message( $key ) {
+	private function amount_label( $key ) {
+		$operation = $this->operations[ $key ];
+		return html_entity_decode( wp_strip_all_tags( wc_price( $operation['amount'] / 100, array( 'currency' => $operation['currency'] ) ) ), ENT_QUOTES, 'UTF-8' );
+	}
+
+	private function result_message() {
+		$key = $this->active_key() ?: array_key_last( $this->operations );
+		if ( null === $key ) { return array( 'type' => 'info', 'message' => __( 'No hay solicitudes de reembolso pendientes.', 'recurrente-for-woocommerce' ) ); }
+		$state = $this->operations[ $key ]['state'];
+		$type = 'completed' === $state ? 'success' : ( in_array( $state, array( 'failed', 'voided' ), true ) ? 'error' : 'warning' );
+		return array( 'type' => $type, 'message' => $this->status_message( $key, false ) );
+	}
+
+	private function status_reference( $key, $include_key ) {
+		$references = array_filter( array( $this->operations[ $key ]['refund_id'], $include_key ? $key : null ) );
+		return $references ? ' (' . implode( ' · ', $references ) . ')' : '';
+	}
+
+	private function requested_message( $key ) {
+		/* translators: %s: refund amount formatted by WooCommerce. */
+		return sprintf( __( 'Solicitud de reembolso de %s registrada.', 'recurrente-for-woocommerce' ), $this->amount_label( $key ) ) . $this->status_reference( $key, true );
+	}
+
+	private function report_status_failure( $key ) {
+		$this->order->add_order_note( $this->status_message( $key ) );
+		throw new RuntimeException( $this->status_message( $key, false ) );
+	}
+
+	private function status_message( $key, $include_key = true ) {
 		$operation = $this->operations[ $key ];
 		$states = array(
-			'unknown' => __( 'resultado desconocido; no solicités otro reembolso', 'recurrente-for-woocommerce' ),
-			'pending' => __( 'pendiente; todavía no se registró como reembolsado en WooCommerce', 'recurrente-for-woocommerce' ),
+			'unknown' => __( 'sin confirmar; no solicités otro reembolso', 'recurrente-for-woocommerce' ),
+			'pending' => __( 'pendiente en Recurrente; todavía no se registró en WooCommerce', 'recurrente-for-woocommerce' ),
 			'succeeded' => __( 'confirmado en Recurrente', 'recurrente-for-woocommerce' ),
-			'failed' => __( 'fallido; no se confirmó devolución de dinero', 'recurrente-for-woocommerce' ),
-			'voided' => __( 'anulado', 'recurrente-for-woocommerce' ),
-			'completed' => __( 'confirmado y registrado en WooCommerce; no se volvió a reembolsar', 'recurrente-for-woocommerce' ),
+			'failed' => __( 'fallido; Recurrente no confirmó devolución de dinero', 'recurrente-for-woocommerce' ),
+			'voided' => __( 'anulado en Recurrente', 'recurrente-for-woocommerce' ),
+			'completed' => __( 'confirmado y registrado en WooCommerce', 'recurrente-for-woocommerce' ),
 		);
-		/* translators: 1: operation key, 2: remote id, 3: amount, 4: currency, 5: state */
-		return sprintf( __( 'Reembolso %1$s (%2$s), %3$s %4$s: %5$s. Consultá su estado con la acción «Consultar reembolso de Recurrente».', 'recurrente-for-woocommerce' ),
-			$key, $operation['refund_id'] ?: '—', number_format( $operation['amount'] / 100, 2, '.', '' ), $operation['currency'], $states[ $operation['state'] ] ?? $operation['state'] );
+		/* translators: 1: formatted refund amount, 2: refund status. */
+		$message = sprintf( __( 'Reembolso de %1$s %2$s.', 'recurrente-for-woocommerce' ), $this->amount_label( $key ), $states[ $operation['state'] ] ?? $operation['state'] );
+		if ( in_array( $operation['state'], array( 'unknown', 'pending' ), true ) ) {
+			$message .= ' ' . __( 'Para actualizarlo, elegí «Consultar reembolso de Recurrente» en Acciones del pedido.', 'recurrente-for-woocommerce' );
+		}
+		return $message . $this->status_reference( $key, $include_key );
 	}
 }
