@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-28T20:14:53-06:00\n"
+"POT-Creation-Date: 2026-10-28T21:02:22-06:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: recurrente-for-woocommerce\n"
@@ -308,95 +308,99 @@ msgstr ""
 msgid "Hay un reembolso de WooCommerce en curso. Volvé a consultar en unos segundos."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:125
+#: includes/class-recurrente-refund-operations.php:110
+msgid "No se pudo iniciar este reembolso. Esperá unos segundos y volvé a intentarlo."
+msgstr ""
+
+#: includes/class-recurrente-refund-operations.php:128
 msgid "Consultar reembolso de Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:149
+#: includes/class-recurrente-refund-operations.php:152
 msgid "No se pudo consultar este reembolso. Esperá unos segundos y volvé a intentarlo."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:154
-msgid "No se pudo registrar este reembolso en WooCommerce. Contactá a soporte de Recurrente con el número de pedido."
+#: includes/class-recurrente-refund-operations.php:157
+msgid "Este reembolso necesita revisión. Contactá a soporte de Recurrente con el número de pedido."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:206
+#: includes/class-recurrente-refund-operations.php:208
 msgid "No tenés permiso para reembolsar este pedido."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:217
+#: includes/class-recurrente-refund-operations.php:219
 msgid "Ya existe una solicitud de reembolso. Usá la acción «Consultar reembolso de Recurrente» antes de solicitar otro."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:235
+#: includes/class-recurrente-refund-operations.php:237
 msgid "Iniciá el reembolso desde el formulario de reembolsos del pedido."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:252
+#: includes/class-recurrente-refund-operations.php:254
 msgid "No se puede reembolsar este pedido mediante Recurrente porque no encontramos su pago original. Contactá a soporte de Recurrente."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:273
+#: includes/class-recurrente-refund-operations.php:275
 msgid "El monto debe ser positivo y no superar el saldo reembolsable."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:292
+#: includes/class-recurrente-refund-operations.php:294
 msgid "El monto del reembolso debe tener como máximo dos decimales."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:301
+#: includes/class-recurrente-refund-operations.php:303
 msgid "Falta la llave del ambiente original del pedido."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:309
+#: includes/class-recurrente-refund-operations.php:313
 msgid "Resultado desconocido fuera de la ventana segura. Soporte debe reconciliar la solicitud original; no generés otra."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:362
+#: includes/class-recurrente-refund-operations.php:368
 msgid "El reembolso en Recurrente no coincide con este pedido (monto o moneda). No lo registramos en WooCommerce; contactá a soporte de Recurrente."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:469
+#: includes/class-recurrente-refund-operations.php:475
 msgid "No hay solicitudes de reembolso pendientes."
 msgstr ""
 
 #. translators: %s: refund amount formatted by WooCommerce.
-#: includes/class-recurrente-refund-operations.php:482
+#: includes/class-recurrente-refund-operations.php:488
 #, php-format
 msgid "Solicitud de reembolso de %s registrada."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:493
+#: includes/class-recurrente-refund-operations.php:499
 msgid "sin confirmar; no solicités otro reembolso"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:494
+#: includes/class-recurrente-refund-operations.php:500
 msgid "pendiente en Recurrente; todavía no se registró en WooCommerce"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:495
+#: includes/class-recurrente-refund-operations.php:501
 msgid "confirmado en Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:496
+#: includes/class-recurrente-refund-operations.php:502
 msgid "fallido; Recurrente no confirmó devolución de dinero"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:497
+#: includes/class-recurrente-refund-operations.php:503
 msgid "anulado en Recurrente"
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:498
+#: includes/class-recurrente-refund-operations.php:504
 msgid "confirmado y registrado en WooCommerce"
 msgstr ""
 
 #. translators: 1: formatted refund amount, 2: refund status.
-#: includes/class-recurrente-refund-operations.php:501
+#: includes/class-recurrente-refund-operations.php:507
 #, php-format
 msgid "Reembolso de %1$s %2$s."
 msgstr ""
 
-#: includes/class-recurrente-refund-operations.php:503
+#: includes/class-recurrente-refund-operations.php:509
 msgid "Para actualizarlo, elegí «Consultar reembolso de Recurrente» en Acciones del pedido."
 msgstr ""
 

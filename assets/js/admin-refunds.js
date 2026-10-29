@@ -10,13 +10,19 @@
 		return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	}
 
-	function showNotice(message, kind) {
+	function showNotice(message, kind, reveal) {
 		const inside = $('#woocommerce-order-items .inside');
 		if (!inside.length) { return null; }
 		inside.find('.recurrente-refund-notice').remove();
 		const notice = $('<div>').addClass('notice inline recurrente-refund-notice ' + kind).attr('role', 'status');
 		notice.append($('<p>').text(message));
 		inside.prepend(notice);
+		if (reveal !== false) {
+			const bounds = notice[0].getBoundingClientRect();
+			if (bounds.top < 56 || bounds.bottom > window.innerHeight) {
+				notice[0].scrollIntoView({ block: 'nearest', behavior: reducedMotion() ? 'auto' : 'smooth' });
+			}
+		}
 		if (!reducedMotion() && notice[0].animate) {
 			notice[0].animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200, easing: 'ease-out' });
 		}
@@ -61,7 +67,7 @@
 		} catch (_error) { return; }
 		const refundId = config.refundRows && config.refundRows['woo_refund_' + operation];
 		if (!refundId) { return; }
-		const notice = showNotice(config.success, 'notice-success');
+		const notice = showNotice(config.success, 'notice-success', false);
 		const row = document.querySelector('tr.refund[data-order_refund_id="' + Number(refundId) + '"]');
 		if (!row || reducedMotion()) { return; }
 		row.scrollIntoView({ block: 'center', behavior: 'smooth' });

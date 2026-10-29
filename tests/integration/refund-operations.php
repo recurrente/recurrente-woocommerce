@@ -249,7 +249,7 @@ try {
 		do_action( 'woocommerce_order_action_recurrente_check_refund', $order );
 		$notes = array_map( function ( $note ) { return $note->content; }, wc_get_order_notes( array( 'order_id' => $order->get_id(), 'limit' => 20 ) ) );
 		$text = implode( ' ', $notes );
-		woo13_assert( false !== strpos( $text, 'No se pudo registrar este reembolso en WooCommerce' ), 'Merchant did not receive the Spanish support error' );
+		woo13_assert( false !== strpos( $text, 'Este reembolso necesita revisión.' ), 'Merchant did not receive the Spanish support error' );
 		woo13_assert( false === strpos( $text, 'Native Woo refund has not finished' ), 'Internal English error leaked into the order notes' );
 		woo13_assert( 2 === count( $calls ) && $calls[0]['args']['headers']['Idempotency-Key'] === $calls[1]['args']['headers']['Idempotency-Key']
 			&& $calls[0]['args']['body'] === $calls[1]['args']['body'], 'Recovery replaced the original monetary request' );
@@ -422,6 +422,12 @@ try {
 			$resource = array_merge( woo13_resource(), $changes );
 			$remote = function () use ( $resource ) { return woo13_response( $resource ); };
 			woo13_assert( is_wp_error( woo13_native( $order ) ), 'Malformed response returned success' );
+			woo13_accounted( $order, 0, 0 );
+			Recurrente_Refund_Operations::release_native();
+			$before = count( wc_get_order_notes( array( 'order_id' => $order->get_id(), 'limit' => 100 ) ) );
+			do_action( 'woocommerce_order_action_recurrente_check_refund', $order );
+			$after = count( wc_get_order_notes( array( 'order_id' => $order->get_id(), 'limit' => 100 ) ) );
+			woo13_assert( $after === $before + 1, 'One failed query should record exactly one result note' );
 			woo13_accounted( $order, 0, 0 );
 		} );
 	}

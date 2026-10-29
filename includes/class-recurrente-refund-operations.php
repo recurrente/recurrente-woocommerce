@@ -105,6 +105,9 @@ class Recurrente_Refund_Operations {
 			return Recurrente_Order_Lock::run( $order_id, function ( $order ) use ( $amount, $reason ) {
 				return ( new self( $order ) )->initiate( $amount, $reason );
 			} );
+		} catch ( Recurrente_Order_Locked $e ) {
+			Recurrente_Logger::error( $e->getMessage(), array( 'order_id' => $order_id ) );
+			return new WP_Error( 'recurrente_refund_unconfirmed', __( 'No se pudo iniciar este reembolso. Esperá unos segundos y volvé a intentarlo.', 'recurrente-for-woocommerce' ) );
 		} catch ( RuntimeException $e ) {
 			return new WP_Error( 'recurrente_refund_unconfirmed', $e->getMessage() );
 		} finally {
@@ -151,11 +154,10 @@ class Recurrente_Refund_Operations {
 			$notice = array( 'type' => 'warning', 'message' => $message );
 		} catch ( Recurrente_Refund_Failed $e ) {
 			Recurrente_Logger::error( $e->getMessage(), array( 'order_id' => $order->get_id() ) );
-			$message = __( 'No se pudo registrar este reembolso en WooCommerce. Contactá a soporte de Recurrente con el número de pedido.', 'recurrente-for-woocommerce' );
+			$message = __( 'Este reembolso necesita revisión. Contactá a soporte de Recurrente con el número de pedido.', 'recurrente-for-woocommerce' );
 			$order->add_order_note( $message );
 			$notice = array( 'type' => 'error', 'message' => $message );
 		} catch ( RuntimeException $e ) {
-			$order->add_order_note( $e->getMessage() );
 			$notice = array( 'type' => 'warning', 'message' => $e->getMessage() );
 		}
 		Recurrente_Refund_Admin::remember_result( $order->get_id(), $notice );
@@ -298,7 +300,9 @@ class Recurrente_Refund_Operations {
 		$settings = get_option( 'woocommerce_recurrente_settings', array() );
 		$key = $settings[ $operation['mode'] . '_secret_key' ] ?? '';
 		if ( ! is_string( $key ) || '' === trim( $key ) ) {
-			throw new RuntimeException( __( 'Falta la llave del ambiente original del pedido.', 'recurrente-for-woocommerce' ) );
+			$message = __( 'Falta la llave del ambiente original del pedido.', 'recurrente-for-woocommerce' );
+			$this->order->add_order_note( $message );
+			throw new RuntimeException( $message );
 		}
 		return new Recurrente_API_Client( $key );
 	}
@@ -306,7 +310,9 @@ class Recurrente_Refund_Operations {
 	private function send( $key ) {
 		$operation = $this->operations[ $key ];
 		if ( time() - $operation['started_at'] >= self::RETRY_WINDOW ) {
-			throw new RuntimeException( __( 'Resultado desconocido fuera de la ventana segura. Soporte debe reconciliar la solicitud original; no generés otra.', 'recurrente-for-woocommerce' ) );
+			$message = __( 'Resultado desconocido fuera de la ventana segura. Soporte debe reconciliar la solicitud original; no generés otra.', 'recurrente-for-woocommerce' );
+			$this->order->add_order_note( $message );
+			throw new RuntimeException( $message );
 		}
 		try {
 			$resource = $this->client( $operation )->create_refund( $operation['payload'], $key );
