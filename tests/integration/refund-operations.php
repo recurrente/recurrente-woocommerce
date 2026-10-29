@@ -153,6 +153,46 @@ try {
 		woo13_accounted( $order, 0, 0 );
 	} );
 
+	woo13_case( 'recovery keeps ten-second lookups while a native refund keeps its durable header and thirty-second timeout', function () use ( &$calls, $network ) {
+		global $fixture_orders;
+		$order = wc_create_order();
+		$fixture_orders[] = $order->get_id();
+		$order->set_payment_method( 'recurrente' );
+		$order->set_currency( 'GTQ' );
+		$order->set_total( 100 );
+		$order->update_meta_data( '_recurrente_checkout_id', 'ch_composed' . $order->get_id() );
+		$order->update_meta_data( '_recurrente_payment_binding', array( 'mode' => 'live', 'amount' => 10000, 'currency' => 'GTQ', 'dynamic' => false ) );
+		$order->save();
+		$intent_id = 'in_composed' . $order->get_id();
+		$checkout = array( 'id' => $order->get_meta( '_recurrente_checkout_id' ), 'status' => 'paid', 'live_mode' => true,
+			'currency' => 'GTQ', 'total_in_cents' => 10000, 'latest_intent' => array( 'id' => $intent_id ),
+			'metadata' => array( 'wc_order_id' => (string) $order->get_id(), 'wc_order_key' => $order->get_order_key() ) );
+		$intent = array( 'id' => $intent_id, 'legacy_id' => 'pa_composed' . $order->get_id(), 'type' => 'payment',
+			'status' => 'succeeded', 'raw_status' => 'succeeded', 'amount_in_cents' => 10000, 'currency' => 'GTQ', 'checkout' => $checkout );
+		$resource = woo13_resource( 'Composed' . $order->get_id() );
+		$boundary = function ( $pre, $args, $url ) use ( &$calls, $checkout, $intent, $resource ) {
+			$calls[] = array( 'url' => $url, 'args' => $args );
+			if ( Recurrente_API_Client::BASE_URL . '/checkouts/' . $checkout['id'] === $url ) { return woo13_response( $checkout ); }
+			if ( Recurrente_API_Client::BASE_URL . '/intents/' . $intent['id'] === $url ) { return woo13_response( $intent ); }
+			if ( Recurrente_API_Client::BASE_URL . '/refunds' === $url && 'POST' === $args['method'] ) { return woo13_response( $resource ); }
+			return new WP_Error( 'fixture_network_blocked', 'Unexpected composition request.' );
+		};
+		remove_filter( 'pre_http_request', $network, 1 );
+		add_filter( 'pre_http_request', $boundary, 1, 3 );
+		try {
+			woo13_assert( 'paid' === Recurrente_Payment_Reconciliation::reconcile( $order->get_id() ), 'Combined recovery failed' );
+			$token = wp_generate_uuid4();
+			woo13_assert( ! is_wp_error( woo13_native( wc_get_order( $order->get_id() ), 25, array(), $token ) ), 'Recovered order could not refund' );
+			Recurrente_Refund_Operations::release_native();
+			woo13_accounted( $order, 25, 1 );
+			woo13_assert( array( 10, 10, 30 ) === array_column( array_column( $calls, 'args' ), 'timeout' ), 'Recovery/refund timeouts collided' );
+			woo13_assert( 'woo_refund_' . $token === $calls[2]['args']['headers']['Idempotency-Key'], 'Refund lost durable identity' );
+			woo13_assert( true === json_decode( $calls[2]['args']['body'], true )['require_new_refund'], 'Strict creation flag lost' );
+		} finally {
+			remove_filter( 'pre_http_request', $boundary, 1 );
+			add_filter( 'pre_http_request', $network, 1, 3 );
+		}
+	} );
 	woo13_case( 'native partial uses confirmed original pa_ intent and LIVE key despite TEST toggle; echoes never double account', function () use ( &$remote, &$calls ) {
 		$order = woo13_order();
 		$resource = woo13_resource();

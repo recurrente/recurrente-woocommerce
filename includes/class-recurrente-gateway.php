@@ -1,7 +1,7 @@
 <?php
 /**
  * The Recurrente payment gateway: settings, and the redirect-to-hosted-checkout
- * payment flow. WooCommerce owns the order; fulfillment happens by webhook, so
+ * payment flow. WooCommerce owns the order; fulfillment requires server confirmation, so
  * process_payment() only creates the checkout and hands back the redirect URL.
  */
 
@@ -265,6 +265,7 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 
 	private function redirect_to( $order, $checkout, $metadata ) {
 		$order->update_meta_data( '_recurrente_checkout_id', $checkout['id'] );
+		$order->update_meta_data( '_recurrente_reconciliation_checked_at', 0 );
 		$order->update_meta_data( '_recurrente_payment_binding', array(
 			'attempt'     => $metadata['wc_payment_attempt'],
 			'base_amount' => $checkout['total_in_cents'] ?? null,

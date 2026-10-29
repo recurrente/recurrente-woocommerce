@@ -32,14 +32,19 @@ class Recurrente_API_Client {
 		return $this->post( '/checkouts', $payload );
 	}
 
-	/** Resolve the original checkout's environment when upgrading an already-paid legacy order. */
-	public function get_checkout( $id ) {
-		return $this->request( 'GET', '/checkouts/' . rawurlencode( $id ) );
+	/** Read the authoritative checkout, using its original environment key. */
+	public function get_checkout( $id, $timeout = 30 ) {
+		return $this->request( 'GET', '/checkouts/' . rawurlencode( $id ), null, array( 'timeout' => $timeout ) );
+	}
+
+	/** The normalized API intent includes status, charge identity and checkout binding. */
+	public function get_intent( $id ) {
+		return $this->request( 'GET', '/intents/' . rawurlencode( $id ), null, array( 'timeout' => 10 ) );
 	}
 
 	/** The caller must persist the key and exact payload before sending money requests. */
 	public function create_refund( array $payload, $operation_key ) {
-		return $this->request( 'POST', '/refunds', $payload, array( 'Idempotency-Key' => $operation_key ) );
+		return $this->request( 'POST', '/refunds', $payload, array( 'headers' => array( 'Idempotency-Key' => $operation_key ) ) );
 	}
 
 	public function get_refund( $id ) {
@@ -78,11 +83,11 @@ class Recurrente_API_Client {
 		return $this->request( 'POST', $path, $payload );
 	}
 
-	private function request( $method, $path, ?array $payload = null, array $headers = array() ) {
+	private function request( $method, $path, ?array $payload = null, array $options = array() ) {
 		$args = array(
 			'method'  => $method,
-			'headers' => array_merge( $this->headers(), $headers ),
-			'timeout' => 30,
+			'headers' => array_merge( $this->headers(), $options['headers'] ?? array() ),
+			'timeout' => $options['timeout'] ?? 30,
 		);
 		if ( null !== $payload ) {
 			$args['body'] = wp_json_encode( $payload );

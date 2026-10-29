@@ -2,6 +2,6 @@
   "name": "recurrente-for-woocommerce-tests",
   "private": true,
   "scripts": {
-    "test": "node --test tests/admin-refunds.test.js"
+    "test": "node --test --test-concurrency=2 tests/*.test.js"
   }
 }
