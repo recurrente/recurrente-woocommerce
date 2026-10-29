@@ -32,9 +32,14 @@ class Recurrente_API_Client {
 		return $this->post( '/checkouts', $payload );
 	}
 
-	/** Resolve the original checkout's environment when upgrading an already-paid legacy order. */
-	public function get_checkout( $id ) {
-		return $this->request( 'GET', '/checkouts/' . rawurlencode( $id ) );
+	/** Read the authoritative checkout, using its original environment key. */
+	public function get_checkout( $id, $timeout = 30 ) {
+		return $this->request( 'GET', '/checkouts/' . rawurlencode( $id ), null, $timeout );
+	}
+
+	/** The normalized API intent includes status, charge identity and checkout binding. */
+	public function get_intent( $id ) {
+		return $this->request( 'GET', '/intents/' . rawurlencode( $id ), null, 10 );
 	}
 
 	/**
@@ -69,11 +74,11 @@ class Recurrente_API_Client {
 		return $this->request( 'POST', $path, $payload );
 	}
 
-	private function request( $method, $path, ?array $payload = null ) {
+	private function request( $method, $path, ?array $payload = null, $timeout = 30 ) {
 		$args = array(
 			'method'  => $method,
 			'headers' => $this->headers(),
-			'timeout' => 30,
+			'timeout' => $timeout,
 		);
 		if ( null !== $payload ) {
 			$args['body'] = wp_json_encode( $payload );

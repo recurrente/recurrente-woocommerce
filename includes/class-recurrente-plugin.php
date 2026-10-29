@@ -43,6 +43,9 @@ class Recurrente_Plugin {
 		require_once $dir . 'class-recurrente-charge-order-link.php';
 		require_once $dir . 'class-recurrente-refund-sync.php';
 		require_once $dir . 'class-recurrente-webhook-handler.php';
+		require_once $dir . 'class-recurrente-payment-reconciliation.php';
+		require_once $dir . 'class-recurrente-pending-payments.php';
+		require_once $dir . 'class-recurrente-payment-recovery.php';
 		require_once $dir . 'class-recurrente-subscriptions.php';
 		require_once $dir . 'class-recurrente-gateway.php';
 	}
@@ -52,6 +55,8 @@ class Recurrente_Plugin {
 		add_action( 'rest_api_init', array( 'Recurrente_Webhook_Handler', 'register_route' ) );
 		add_action( 'woocommerce_blocks_loaded', array( $this, 'register_blocks_support' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( RECURRENTE_PLUGIN_FILE ), array( $this, 'settings_link' ) );
+		Recurrente_Pending_Payments::register_hooks();
+		Recurrente_Payment_Recovery::register_hooks();
 		Recurrente_Subscriptions::register_hooks();
 		Recurrente_Telemetry::register_hooks();
 	}

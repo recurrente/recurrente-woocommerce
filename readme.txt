@@ -27,6 +27,7 @@ Features:
 * Compatible with High-Performance Order Storage (HPOS).
 * Works with both the block-based checkout (WooCommerce 8.3+ default) and the classic shortcode checkout.
 * Separate TEST and LIVE keys, webhook endpoints and signing secrets.
+* Recover pending paid orders via authenticated API checks on return, in order actions, and in bounded scheduled jobs.
 * End-to-end sandbox payments with simulated webhooks.
 
 == External services ==
@@ -36,7 +37,11 @@ create payment sessions. When an order is placed it sends the buyer's billing
 details (name, email, phone and address) and the order line items (products,
 quantities and amounts) to Recurrente, which are required to prefill and charge
 the hosted checkout. Payment notifications (webhooks) are delivered by
-Recurrente through Svix (https://www.svix.com/).
+Recurrente through Svix (https://www.svix.com/). Pending orders can also trigger
+authenticated read-only checkout and intent lookups on buyer return, from the
+admin order actions, or through Action Scheduler (WP-Cron fallback). These checks
+verify the original payment and never initiate another charge. Simulated TEST
+payments without a retrievable intent still require their signed webhook.
 
 The plugin also reports connection, disconnection, version and health to
 https://app.recurrente.com/api/plugin_events. These reports include the store

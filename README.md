@@ -26,8 +26,9 @@ restan otra vez. Las órdenes de total cero o negativo y las diferencias que exc
 rechazan antes de crear un cliente o un checkout en Recurrente; una orden gratuita debe seguir el
 flujo sin pago de WooCommerce. Esta conciliación no modifica las suscripciones.
 
-El pago se marca **únicamente por webhook**, con la firma Svix verificada; el regreso del comprador por
-`success_url` nunca marca una orden como pagada. Un reembolso en Recurrente (total o parcial) reembolsa
+El pago se marca por un webhook con firma Svix verificada o una consulta autenticada a Recurrente
+que confirma el checkout y su intent. El regreso por `success_url` solo dispara esa consulta;
+los parámetros del navegador nunca prueban que la orden está pagada. Un reembolso en Recurrente (total o parcial) reembolsa
 y reabastece la orden por el monto exacto; cada reembolso se aplica una sola vez.
 
 Soporta suscripciones (requiere **WooCommerce Subscriptions**): Recurrente es dueño del ciclo de cobro
@@ -51,7 +52,7 @@ Recurrente pueda alcanzar; un sitio disponible solo en `localhost` no recibirá 
 
 ## Conciliación e identidad del pago
 
-La creación del checkout y la validación/aplicación del webhook comparten un bloqueo por orden.
+La creación del checkout, la validación/aplicación del webhook y la recuperación comparten un bloqueo por orden.
 Se recargan sus propiedades y metadata después de adquirirlo; un intento nuevo no puede reemplazar
 la identidad entre la validación y la confirmación. Si el bloqueo no está disponible, el webhook
 responde 503 sin marcarse procesado y el inicio del pago permite reintentar sin llamadas a la API.
@@ -100,6 +101,63 @@ Antes de conciliar manualmente, compará la referencia del pago en Recurrente co
 la suscripción en WooCommerce, el ambiente, el monto y la moneda. Si el resultado es incierto,
 contactá a soporte con esos identificadores y el mensaje del log, sin llaves ni secretos.
 No abras otro cobro solo porque el webhook no actualizó la orden.
+
+## Recuperar un pago sin webhook aplicado
+
+Esta recuperación requiere publicar e instalar la versión del plugin que la incluye;
+las instalaciones anteriores conservan su comportamiento. Las pruebas locales CPT/HPOS
+no sustituyen la aceptación en una tienda alojada ni una medición de la latencia real.
+
+Si un comprador pagó Q100 pero WooCommerce sigue mostrando la orden pendiente, el plugin consulta
+`GET /checkouts/{id}` y después `GET /intents/{id}` con la llave secreta del ambiente original.
+Solo concilia si el checkout está pagado, el intent está confirmado y ambos conservan la misma
+identidad, monto, moneda y metadata. Se aplican las mismas validaciones de orden, intento, ambiente
+y precio dinámico del webhook. La confirmación vuelve a adquirir el bloqueo y recarga la orden
+invalidando las cachés CPT y HPOS; un webhook simultáneo o un intento reemplazado no produce una
+segunda confirmación. La referencia persistida del cobro también deduplica los eventos que lleguen después.
+
+La consulta se puede iniciar de tres formas:
+
+- Al regresar a la confirmación de WooCommerce con la clave correcta de la orden. Para órdenes de
+  clientes registrados también se exige su sesión o un usuario con permiso para editar la orden.
+- Desde **Acciones de la orden → Consultar pago en Recurrente**, con permiso de edición y el nonce
+  del formulario de WooCommerce. Mientras consulta, bloquea un segundo envío y muestra
+  **Consultando a Recurrente…**. El aviso final aparece una sola vez en esa orden para el
+  usuario que hizo la consulta. Los resultados quedan como notas privadas atribuidas a ese
+  usuario; una consulta demasiado reciente o una orden que ya dejó de estar pendiente no
+  agrega una nota permanente.
+- Cada cinco minutos, con Action Scheduler o WP-Cron como respaldo. Cada revisión busca hasta 20
+  órdenes pendientes o en espera, de entre dos minutos y siete días de antigüedad, y programa una
+  tarea por orden. La paginación avanza aunque una orden siga impaga. El retorno y la acción
+  administrativa también permiten revisar órdenes más antiguas.
+
+Las consultas por orden tienen un intervalo mínimo de un minuto, incluso si la API falla; el
+retorno repetido no genera llamadas ilimitadas. El retorno espera la consulta antes de mostrar
+la confirmación y los permisos de descarga. Cada GET tiene un timeout de diez segundos; ese
+límite por llamada no es un presupuesto total del retorno ni de la espera por los bloqueos. Un
+error o una identidad incompatible deja la orden pendiente para un intento posterior. No se crea
+otro checkout, no se vuelve a cobrar ni se cambia una orden cancelada, fallida o reembolsada.
+Las renovaciones de suscripciones siguen dependiendo de sus webhooks. Action Scheduler y WP-Cron
+requieren ejecución de tareas en el sitio; en tiendas sin tráfico conviene configurar un cron real.
+
+**Límite TEST:** los pagos de prueba simulados no crean un intent persistido consultable. Aunque
+el checkout diga `paid`, el plugin deja esa orden pendiente si falta `latest_intent.id`; no inventa
+una referencia ni deduplica contra un ID ficticio. Esos pagos siguen requiriendo el webhook TEST
+con firma válida. Un intent consultable sin `legacy_id` tampoco se recupera: esa referencia es
+necesaria para coincidir con la deduplicación histórica del plugin. No se hicieron pagos reales
+para validar este cambio.
+
+Las órdenes antiguas sin ambiente guardado se buscan con las llaves configuradas; solo un 404
+permite probar la otra llave y la respuesta debe declarar el ambiente esperado. Los límites de
+monto base de precio dinámico descritos arriba también se conservan en esta recuperación.
+
+Contrato: [consulta de checkout](https://docs.recurrente.com/referencia-api/api-reference/checkouts/get-checkout)
+y [consulta de intent](https://docs.recurrente.com/referencia-api/api-reference/intents/get-intent).
+El patrón sigue la [guía de fulfillment de Stripe](https://docs.stripe.com/checkout/fulfillment):
+webhook y retorno llaman una confirmación idempotente con datos del servidor. Recurrente requiere
+dos consultas para recuperar el intent normalizado y su ID histórico; un checkout TEST pagado no
+ofrece el mismo contrato de consulta que una Checkout Session de Stripe. La revisión programada
+es un respaldo adicional y no reemplaza los webhooks de pagos y suscripciones.
 
 ## Telemetría
 

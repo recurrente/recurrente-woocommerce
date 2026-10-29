@@ -253,3 +253,43 @@ msgstr ""
 #: includes/class-recurrente-webhook-registrar.php:113
 msgid "producción"
 msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:34
+msgid "Consultar pago en Recurrente"
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:56
+msgid "Pago confirmado al consultar Recurrente."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:57
+msgid "Recurrente aún no confirma el pago."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:58
+msgid "Este pago se consultó hace menos de un minuto. Intentá de nuevo en un momento."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:59
+msgid "Esta orden ya no está pendiente de pago."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:60
+msgid "El pago en Recurrente no coincide con esta orden. Revisalo en Recurrente antes de cobrar otra vez."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:61
+msgid "Este pago no se puede verificar desde WooCommerce. Revisalo en Recurrente antes de cambiar el estado de la orden."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:62
+msgid "No se pudo consultar Recurrente. Intentá de nuevo en unos minutos."
+msgstr ""
+
+#: includes/class-recurrente-payment-recovery.php:88
+msgid "Consultando a Recurrente…"
+msgstr ""
+
+#: includes/class-recurrente-pending-payments.php:21
+msgid "Cada cinco minutos"
+msgstr ""

@@ -123,6 +123,16 @@ $recurrente_test_orders = array();
 if ( ! function_exists( 'wc_get_orders' ) ) {
 	function wc_get_orders( $args ) {
 		global $recurrente_test_orders;
+		if ( isset( $args['payment_method'] ) ) {
+			$GLOBALS['recurrente_scan_queries'][] = $args;
+			$dates = explode( '...', $args['date_created'] );
+			$orders = array_values( array_filter( $recurrente_test_orders, function ( $order ) use ( $args, $dates ) {
+				return $order->get_payment_method() === $args['payment_method'] && $order->has_status( $args['status'] )
+					&& $order->created_at >= $dates[0] && $order->created_at <= $dates[1];
+			} ) );
+			usort( $orders, function ( $a, $b ) { return $a->get_id() <=> $b->get_id(); } );
+			return array_slice( $orders, ( $args['paged'] - 1 ) * $args['limit'], $args['limit'] );
+		}
 		$key   = $args['meta_query'][0]['key'];
 		$value = $args['meta_query'][0]['value'];
 		return array_values( array_filter( $recurrente_test_orders, function ( $order ) use ( $key, $value ) {
