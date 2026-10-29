@@ -90,7 +90,7 @@ class Recurrente_Refund_Operations {
 		global $wpdb;
 		$name = 'recurrente_refund_' . md5( (string) $order_id );
 		if ( isset( self::$native_locks[ $order_id ] ) || '1' !== (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $name, 0 ) ) ) {
-			throw new Recurrente_Refund_Failed( __( 'Hay un reembolso de WooCommerce en curso. Volvé a consultar en unos segundos.', 'recurrente-for-woocommerce' ) );
+			throw new Recurrente_Refund_In_Progress( __( 'Hay un reembolso de WooCommerce en curso. Volvé a consultar en unos segundos.', 'recurrente-for-woocommerce' ) );
 		}
 	}
 
@@ -147,7 +147,7 @@ class Recurrente_Refund_Operations {
 					return ( new self( $fresh ) )->result_message();
 				} );
 			} );
-		} catch ( Recurrente_Order_Locked | Recurrente_Charge_Locked $e ) {
+		} catch ( Recurrente_Order_Locked | Recurrente_Charge_Locked | Recurrente_Refund_In_Progress $e ) {
 			Recurrente_Logger::error( $e->getMessage(), array( 'order_id' => $order->get_id() ) );
 			$message = __( 'No se pudo consultar este reembolso. Esperá unos segundos y volvé a intentarlo.', 'recurrente-for-woocommerce' );
 			$order->add_order_note( $message );

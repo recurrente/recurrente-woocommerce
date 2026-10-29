@@ -17,6 +17,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 /** Local mirroring failed; the delivery must remain retryable. */
 class Recurrente_Refund_Failed extends RuntimeException {}
 
+class Recurrente_Refund_In_Progress extends Recurrente_Refund_Failed {}
+
 class Recurrente_Refund_Sync {
 
 	/** Order meta: list of Recurrente refund ids already applied. */

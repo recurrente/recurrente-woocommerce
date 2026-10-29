@@ -37,7 +37,41 @@ if ( 'native' === $actor || 'overlap' === $actor ) {
 	try {
 		$result = wc_create_refund( array( 'order_id' => $order->get_id(), 'amount' => 25, 'refund_payment' => true ) );
 		echo wp_json_encode( array( 'unconfirmed' => is_wp_error( $result ), 'http_calls' => $calls ) ) . "\n";
+		if ( 'native' === $actor ) {
+			echo "NATIVE_AFTER_REFUND\n";
+			flush();
+			if ( "finish\n" !== fgets( STDIN ) ) { throw new RuntimeException( 'Test coordinator ended before native shutdown.' ); }
+		}
 	} finally { update_option( 'woocommerce_recurrente_settings', $original ); }
+	return;
+}
+if ( 'query' === $actor ) {
+	$calls = 0;
+	add_filter( 'pre_http_request', function () use ( &$calls ) {
+		$calls++;
+		return new WP_Error( 'fixture_blocked', 'A concurrent query must not reach HTTP.' );
+	}, 1, 3 );
+	$journal = $order->get_meta( Recurrente_Refund_Operations::META );
+	$notes_before = count( wc_get_order_notes( array( 'order_id' => $order->get_id(), 'limit' => 100 ) ) );
+	do_action( 'woocommerce_order_action_recurrente_check_refund', $order );
+	if ( ! class_exists( 'WP_Screen' ) ) { require_once ABSPATH . 'wp-admin/includes/class-wp-screen.php'; }
+	if ( ! function_exists( 'set_current_screen' ) ) { require_once ABSPATH . 'wp-admin/includes/screen.php'; }
+	set_current_screen( function_exists( 'wc_get_page_screen_id' ) ? wc_get_page_screen_id( 'shop-order' ) : 'shop_order' );
+	$_GET = array( 'action' => 'edit', 'post' => (string) $order->get_id(), 'id' => (string) $order->get_id() );
+	ob_start();
+	Recurrente_Refund_Admin::result_notice();
+	$notice = ob_get_clean();
+	$notes = wc_get_order_notes( array( 'order_id' => $order->get_id(), 'limit' => 100 ) );
+	$fresh = wc_get_order( $order->get_id() );
+	$fresh->read_meta_data( true );
+	echo wp_json_encode( array(
+		'warning' => false !== strpos( $notice, 'notice-warning' ),
+		'note' => $notes[0]->content,
+		'new_notes' => count( $notes ) - $notes_before,
+		'http_calls' => $calls,
+		'journal_unchanged' => $journal === $fresh->get_meta( Recurrente_Refund_Operations::META ),
+		'refunded' => (float) $fresh->get_total_refunded(),
+	) ) . "\n";
 	return;
 }
 $original = get_option( 'recurrente_webhook_secret_live', '' );
