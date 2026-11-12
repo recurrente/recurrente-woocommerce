@@ -16,6 +16,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+class Recurrente_Invalid_Tax_Category extends UnexpectedValueException {}
+
 class Recurrente_Checkout_Builder {
 
 	const MAX_QUANTITY      = 9;
@@ -68,6 +70,21 @@ class Recurrente_Checkout_Builder {
 			if ( ! empty( $this->options['has_dynamic_pricing'] ) ) {
 				$item['has_dynamic_pricing'] = true;
 			}
+		}
+		/**
+		 * Set FEL classification without editing the plugin or changing amounts.
+		 * Runs on each final line, including recurring and reconciled-order lines.
+		 *
+		 * @param string|null $tax_category 'good', 'service', or null to use the API default.
+		 * @param array       $item         Final item with the gateway options applied.
+		 * @param WC_Order    $order        The originating WooCommerce order.
+		 */
+		$tax_category = apply_filters( 'recurrente_checkout_item_tax_category', null, $item, $this->order );
+		if ( null !== $tax_category ) {
+			if ( ! in_array( $tax_category, array( 'good', 'service' ), true ) ) {
+				throw new Recurrente_Invalid_Tax_Category( 'recurrente_checkout_item_tax_category must return good, service, or null.' );
+			}
+			$item['tax_category'] = $tax_category;
 		}
 		return $item;
 	}

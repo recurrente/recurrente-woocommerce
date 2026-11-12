@@ -98,3 +98,32 @@ it( 'gateway: empty positive order fails before any HTTP', function () {
 	$order->total = '10.00';
 	return array( 'result' => 'failure' ) === recurrente_process_test_order( $order ) && ! $GLOBALS['recurrente_checkout_requests'];
 } );
+
+it( 'gateway: service classification reaches the serialized checkout without changing payment binding', function () {
+	$order = new Stub_Checkout_Order();
+	$order->items = array( new Stub_Line_Item( 'Sesión fotográfica', 1, 350, 350 ) );
+	return recurrente_with_tax_filter( function () { return 'service'; }, function () use ( $order ) {
+		$result = recurrente_process_test_order( $order );
+		$requests = $GLOBALS['recurrente_checkout_requests'];
+		$payload = json_decode( $requests[1]['args']['body'], true );
+		return 'success' === $result['result'] && 2 === count( $requests )
+			&& Recurrente_API_Client::BASE_URL . '/checkouts' === $requests[1]['url']
+			&& 'service' === $payload['items'][0]['tax_category'] && 35000 === recurrente_items_total( $payload['items'] )
+			&& 35000 === $order->meta['_recurrente_payment_binding']['amount'] && 'ch_test' === $order->meta['_recurrente_checkout_id'];
+	} );
+} );
+
+it( 'gateway: invalid fiscal callback fails before HTTP or order binding', function () {
+	$order = new Stub_Checkout_Order();
+	$order->items = array( new Stub_Line_Item( 'Sesión fotográfica', 1, 350, 350 ) );
+	return recurrente_with_tax_filter( function () { return 'Servicio'; }, function () use ( $order ) {
+		$GLOBALS['recurrente_logged'] = array();
+		return array( 'result' => 'failure' ) === recurrente_process_test_order( $order )
+			&& ! $GLOBALS['recurrente_checkout_requests'] && ! $order->saved && ! $order->meta && ! $order->notes
+			&& array( 'No pudimos iniciar el pago con Recurrente. Elegí otro método de pago o contactá a la tienda.' ) === $GLOBALS['recurrente_binding_notices']
+			&& 1 === count( $GLOBALS['recurrente_logged'] )
+			&& 'error' === $GLOBALS['recurrente_logged'][0]['level']
+			&& false !== strpos( $GLOBALS['recurrente_logged'][0]['message'], 'recurrente_checkout_item_tax_category must return good, service, or null.' )
+			&& false === strpos( $GLOBALS['recurrente_logged'][0]['message'], 'total does not reconcile' );
+	} );
+} );
