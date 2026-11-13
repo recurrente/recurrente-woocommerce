@@ -231,6 +231,9 @@ class Recurrente_Gateway extends WC_Payment_Gateway {
 		}
 		try {
 			$items = $builder->items();
+		} catch ( Recurrente_Invalid_Tax_Category $e ) {
+			Recurrente_Logger::error( $e->getMessage(), array( 'order' => $order->get_id() ) );
+			return $this->fail( __( 'No pudimos iniciar el pago con Recurrente. Elegí otro método de pago o contactá a la tienda.', 'recurrente-for-woocommerce' ) );
 		} catch ( UnexpectedValueException $e ) {
 			return $this->reject_unreconciled( $order );
 		}

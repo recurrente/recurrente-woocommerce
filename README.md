@@ -35,6 +35,38 @@ Soporta suscripciones (requiere **WooCommerce Subscriptions**): Recurrente es du
 y sincroniza los estados por webhook. Compatible con HPOS y con el checkout por bloques (el default
 desde WooCommerce 8.3), además del checkout clásico.
 
+## Clasificación fiscal: bienes y servicios
+
+En `POST /checkouts`, cada artículo inline acepta `tax_category`: `"service"` para
+Servicio o `"good"` para Bien. Si se omite, la API usa `"good"`.
+Consulta el [contrato fiscal publicado](https://docs.recurrente.com/changelog#tax-classification-on-products-and-checkout-items).
+
+El plugin no tiene un selector fiscal en sus ajustes. El filtro
+`recurrente_checkout_item_tax_category` permite definir la clasificación sin modificar
+los archivos del plugin. Para una tienda que vende exclusivamente servicios, agrega
+este código en un plugin propio o en el `functions.php` de tu tema hijo:
+
+```php
+add_filter( 'recurrente_checkout_item_tax_category', function ( $tax_category, $item, $order ) {
+	return 'service';
+}, 10, 3 );
+```
+
+El filtro recibe la clasificación (`null` inicialmente), el artículo que se enviará y
+la orden `WC_Order`. Devuelve `good`, `service` o `null` para omitir el campo; cualquier
+otro valor detiene la creación del checkout. No modifica importes, cantidades ni moneda.
+Sin un filtro, el payload sigue igual que antes.
+
+Se ejecuta sobre **todas las líneas finales**: productos, envío, cargos, suscripciones y
+cuotas de inscripción. También sobre la única línea del pedido cuando la conciliación
+agrupa sus importes. El ejemplo marca todas esas líneas como Servicio; úsalo solo si esa
+es su clasificación. En pedidos mixtos, el callback debe elegir por línea. Si un pedido
+mixto se agrupa en una sola línea, este filtro no puede conservar clasificaciones distintas
+para sus productos originales. No se deduce la clasificación de que un producto sea virtual.
+
+Esto define la clasificación de checkouts nuevos; no activa la facturación automática ni
+reclasifica cobros existentes. Los requisitos de facturación de la cuenta siguen aplicando.
+
 ## Pruebas y producción
 
 El plugin mantiene separados los dos ambientes:

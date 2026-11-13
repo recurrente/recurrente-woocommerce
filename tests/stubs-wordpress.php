@@ -14,6 +14,26 @@ if ( ! isset( $GLOBALS['recurrente_logged'] ) ) {
 	$GLOBALS['recurrente_logged'] = array();
 }
 
+if ( ! function_exists( 'apply_filters' ) ) {
+	function apply_filters( $hook, $value, ...$args ) {
+		foreach ( $GLOBALS['recurrente_test_filters'][ $hook ] ?? array() as $callback ) {
+			$value = $callback( $value, ...$args );
+		}
+		return $value;
+	}
+}
+
+function recurrente_with_tax_filter( $callback, $test ) {
+	$hook = 'recurrente_checkout_item_tax_category';
+	$previous = $GLOBALS['recurrente_test_filters'][ $hook ] ?? array();
+	$GLOBALS['recurrente_test_filters'][ $hook ] = array( $callback );
+	try {
+		return $test();
+	} finally {
+		$GLOBALS['recurrente_test_filters'][ $hook ] = $previous;
+	}
+}
+
 if ( ! function_exists( 'get_option' ) ) {
 	function get_option( $name, $default = false ) {
 		return array_key_exists( $name, $GLOBALS['recurrente_options'] ) ? $GLOBALS['recurrente_options'][ $name ] : $default;
