@@ -4,7 +4,7 @@ Tags: payments, payment gateway, recurrente, guatemala, subscriptions
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 7.4
-Stable tag: 0.1.3
+Stable tag: 0.1.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -83,6 +83,12 @@ Use card 4242 4242 4242 4242 for a successful test payment. Recurrente sends sim
 TEST endpoint, so your WordPress site must have a public URL to verify the complete order flow.
 
 == Changelog ==
+
+= 0.1.4 =
+* Add: recurrente_checkout_item_tax_category filter to classify checkout items as service or good.
+* Fix: recover paid orders whose webhook was not applied, on buyer return, from order actions and in scheduled checks.
+* Fix: bind paid webhooks to the checkout attempt and environment that created them.
+* Fix: honor negative fees and reconcile the checkout total with the WooCommerce order total.
 
 = 0.1.3 =
 * Fix: synchronize subscription pause and reactivation with current lifecycle webhooks.
