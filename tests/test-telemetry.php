@@ -9,7 +9,7 @@
  */
 
 if ( ! defined( 'RECURRENTE_PLUGIN_VERSION' ) ) {
-	define( 'RECURRENTE_PLUGIN_VERSION', '0.1.3' );
+	define( 'RECURRENTE_PLUGIN_VERSION', '0.1.4' );
 }
 if ( ! defined( 'DAY_IN_SECONDS' ) ) {
 	define( 'DAY_IN_SECONDS', 86400 );
